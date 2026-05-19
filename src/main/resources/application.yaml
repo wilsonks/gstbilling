@@ -1,0 +1,44 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: gstbilling
+
+
+  datasource:
+    url: jdbc:h2:./gstbillingdb
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+  jackson:
+    timezone: Asia/Kolkata
+app:
+  security:
+    jwt:
+      issuer: gst-billing-software
+      secret: "CHANGE_ME_TO_A_32+_CHAR_SECRET_1234567890"
+      accessTokenMinutes: 1
+
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    expose:
+      include: health,info,prometheus
