@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Badge,
   Box,
@@ -16,6 +16,8 @@ import {
   Progress,
   Select,
   SimpleGrid,
+  Skeleton,
+  Spinner,
   Stack,
   Stat,
   StatHelpText,
@@ -28,6 +30,7 @@ import {
   Th,
   Thead,
   Tr,
+  useToast,
 } from "@chakra-ui/react";
 import {
   AlertTriangle,
@@ -41,173 +44,14 @@ import {
   TrendingUp,
   Users,
 } from "lucide-react";
-
-const DUMMY_BILLING = {
-  summary: {
-    totalTenants: 20,
-    activeSubscriptions: 18,
-    overdueTenants: 2,
-    suspendedTenants: 1,
-    mrr: 184500,
-    arr: 2214000,
-    billedThisMonth: 216450,
-    collectedThisMonth: 198620,
-    outstandingAmount: 17830,
-    gstCollectedThisMonth: 35751.6,
-  },
-  plans: [
-    { name: "Starter", tenants: 7, mrr: 35000, color: "gray" },
-    { name: "Growth", tenants: 6, mrr: 54000, color: "blue" },
-    { name: "Business", tenants: 5, mrr: 62500, color: "purple" },
-    { name: "Enterprise", tenants: 2, mrr: 33000, color: "green" },
-  ],
-  recentInvoices: [
-    {
-      invoiceNo: "SAS-INV-2026-101",
-      tenantId: 20,
-      tenantName: "Demo Tenant 20",
-      amount: 12980,
-      gstAmount: 2336.4,
-      issuedOn: "2026-05-18",
-      dueOn: "2026-05-25",
-      status: "PAID",
-    },
-    {
-      invoiceNo: "SAS-INV-2026-100",
-      tenantId: 19,
-      tenantName: "Demo Tenant 19",
-      amount: 5900,
-      gstAmount: 1062,
-      issuedOn: "2026-05-17",
-      dueOn: "2026-05-24",
-      status: "PENDING",
-    },
-    {
-      invoiceNo: "SAS-INV-2026-099",
-      tenantId: 18,
-      tenantName: "Demo Tenant 18",
-      amount: 8850,
-      gstAmount: 1593,
-      issuedOn: "2026-05-16",
-      dueOn: "2026-05-21",
-      status: "OVERDUE",
-    },
-    {
-      invoiceNo: "SAS-INV-2026-098",
-      tenantId: 17,
-      tenantName: "Demo Tenant 17",
-      amount: 17700,
-      gstAmount: 3186,
-      issuedOn: "2026-05-15",
-      dueOn: "2026-05-22",
-      status: "PAID",
-    },
-  ],
-  tenants: [
-    {
-      tenantId: 20,
-      tenantName: "Demo Tenant 20",
-      gstin: "30ABCDE0020F3Z5",
-      contactEmail: "demo20@company.com",
-      plan: "Enterprise",
-      billingCycle: "MONTHLY",
-      subscriptionStatus: "ACTIVE",
-      paymentStatus: "PAID",
-      mrr: 16500,
-      arr: 198000,
-      billedThisCycle: 19470,
-      outstanding: 0,
-      gstRate: 18,
-      companies: 1,
-      users: 1,
-      lastPaymentDate: "2026-05-18",
-      nextRenewalDate: "2026-06-18",
-    },
-    {
-      tenantId: 19,
-      tenantName: "Demo Tenant 19",
-      gstin: "29ABCDE0019F2Z5",
-      contactEmail: "demo19@company.com",
-      plan: "Growth",
-      billingCycle: "MONTHLY",
-      subscriptionStatus: "ACTIVE",
-      paymentStatus: "PENDING",
-      mrr: 5000,
-      arr: 60000,
-      billedThisCycle: 5900,
-      outstanding: 5900,
-      gstRate: 18,
-      companies: 1,
-      users: 1,
-      lastPaymentDate: "2026-04-18",
-      nextRenewalDate: "2026-05-24",
-    },
-    {
-      tenantId: 18,
-      tenantName: "Demo Tenant 18",
-      gstin: "28ABCDE0018F1Z5",
-      contactEmail: "demo18@company.com",
-      plan: "Business",
-      billingCycle: "MONTHLY",
-      subscriptionStatus: "ACTIVE",
-      paymentStatus: "OVERDUE",
-      mrr: 7500,
-      arr: 90000,
-      billedThisCycle: 8850,
-      outstanding: 8850,
-      gstRate: 18,
-      companies: 1,
-      users: 1,
-      lastPaymentDate: "2026-04-12",
-      nextRenewalDate: "2026-05-21",
-    },
-    {
-      tenantId: 17,
-      tenantName: "Demo Tenant 17",
-      gstin: "27ABCDE0017F9Z5",
-      contactEmail: "demo17@company.com",
-      plan: "Business",
-      billingCycle: "ANNUAL",
-      subscriptionStatus: "ACTIVE",
-      paymentStatus: "PAID",
-      mrr: 12000,
-      arr: 144000,
-      billedThisCycle: 169920,
-      outstanding: 0,
-      gstRate: 18,
-      companies: 1,
-      users: 1,
-      lastPaymentDate: "2026-05-15",
-      nextRenewalDate: "2027-05-15",
-    },
-    {
-      tenantId: 16,
-      tenantName: "Demo Tenant 16",
-      gstin: "26ABCDE0016F8Z5",
-      contactEmail: "demo16@company.com",
-      plan: "Starter",
-      billingCycle: "MONTHLY",
-      subscriptionStatus: "SUSPENDED",
-      paymentStatus: "UNPAID",
-      mrr: 2500,
-      arr: 30000,
-      billedThisCycle: 2950,
-      outstanding: 2950,
-      gstRate: 18,
-      companies: 1,
-      users: 1,
-      lastPaymentDate: "2026-03-10",
-      nextRenewalDate: "2026-05-10",
-    },
-  ],
-};
+import api from "../../services/api";
 
 function formatINR(value) {
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: "INR",
     maximumFractionDigits: 2,
-  }).format(value || 0);
+  }).format(Number(value || 0));
 }
 
 function getStatusColor(status) {
@@ -215,27 +59,34 @@ function getStatusColor(status) {
 
   if (["ACTIVE", "PAID"].includes(normalized)) return "green";
   if (["PENDING"].includes(normalized)) return "orange";
-  if (["OVERDUE", "UNPAID"].includes(normalized)) return "red";
+  if (["OVERDUE", "UNPAID", "PAST_DUE", "FAILED"].includes(normalized)) return "red";
   if (["SUSPENDED"].includes(normalized)) return "purple";
   if (["TRIAL"].includes(normalized)) return "blue";
+  if (["DRAFT", "ISSUED", "CANCELLED", "VOID"].includes(normalized)) return "gray";
 
   return "gray";
 }
 
-function MetricCard({ label, value, helpText, icon, color = "blue.500" }) {
+function MetricCard({
+  label,
+  value,
+  helpText,
+  icon,
+  color = "blue.500",
+  loading = false,
+}) {
   return (
-    <Card
-      borderWidth="1px"
-      borderColor="gray.200"
-      shadow="sm"
-      borderRadius="xl"
-    >
+    <Card borderWidth="1px" borderColor="gray.200" shadow="sm" borderRadius="xl">
       <CardBody>
         <Flex justify="space-between" align="flex-start" gap={4}>
           <Stat>
             <StatLabel color="gray.500">{label}</StatLabel>
-            <StatNumber fontSize="2xl">{value}</StatNumber>
-            <StatHelpText mb="0">{helpText}</StatHelpText>
+            <StatNumber fontSize="2xl">
+              {loading ? <Skeleton height="30px" width="120px" /> : value}
+            </StatNumber>
+            <StatHelpText mb="0">
+              {loading ? <Skeleton height="16px" width="170px" /> : helpText}
+            </StatHelpText>
           </Stat>
 
           <Flex
@@ -256,12 +107,7 @@ function MetricCard({ label, value, helpText, icon, color = "blue.500" }) {
 
 function SectionCard({ title, subtitle, rightAction, children }) {
   return (
-    <Card
-      borderWidth="1px"
-      borderColor="gray.200"
-      shadow="sm"
-      borderRadius="xl"
-    >
+    <Card borderWidth="1px" borderColor="gray.200" shadow="sm" borderRadius="xl">
       <CardBody>
         <Flex
           justify="space-between"
@@ -298,20 +144,81 @@ function InsightRow({ label, value, tone = "gray" }) {
 }
 
 export default function BillingPage() {
+  const toast = useToast();
+
   const [period, setPeriod] = useState("this-month");
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
   const [plan, setPlan] = useState("");
 
-  const billing = DUMMY_BILLING;
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const [billing, setBilling] = useState({
+    summary: null,
+    plans: [],
+    recentInvoices: [],
+    tenants: [],
+    renewalWatchlist: [],
+  });
+
+  const fetchBillingOverview = async ({ silent = false, nextPeriod = period } = {}) => {
+    if (silent) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+
+    try {
+      const res = await api.get("/api/platform/billing/overview", {
+        params: { period: nextPeriod },
+      });
+
+      setBilling({
+        summary: res.data?.summary || null,
+        plans: res.data?.plans || [],
+        recentInvoices: res.data?.recentInvoices || [],
+        tenants: res.data?.tenants || [],
+        renewalWatchlist: res.data?.renewalWatchlist || [],
+      });
+    } catch (error) {
+      toast({
+        title: "Failed to load billing overview",
+        description: error?.response?.data?.message || "Please try again.",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+
+      setBilling({
+        summary: null,
+        plans: [],
+        recentInvoices: [],
+        tenants: [],
+        renewalWatchlist: [],
+      });
+    } finally {
+      if (silent) {
+        setRefreshing(false);
+      } else {
+        setLoading(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    fetchBillingOverview({ nextPeriod: period });
+  }, [period]);
+
+  const summary = billing.summary || {};
 
   const filteredTenants = useMemo(() => {
-    return billing.tenants.filter((tenant) => {
+    return (billing.tenants || []).filter((tenant) => {
       const matchesQuery =
         !query ||
-        tenant.tenantName.toLowerCase().includes(query.toLowerCase()) ||
-        tenant.contactEmail.toLowerCase().includes(query.toLowerCase()) ||
-        tenant.gstin.toLowerCase().includes(query.toLowerCase());
+        String(tenant.tenantName || "").toLowerCase().includes(query.toLowerCase()) ||
+        String(tenant.contactEmail || "").toLowerCase().includes(query.toLowerCase()) ||
+        String(tenant.gstin || "").toLowerCase().includes(query.toLowerCase());
 
       const matchesStatus =
         !status ||
@@ -325,25 +232,25 @@ export default function BillingPage() {
   }, [billing.tenants, query, status, plan]);
 
   const collectionRatio = useMemo(() => {
-    const collected = billing.summary.collectedThisMonth || 0;
-    const billed = billing.summary.billedThisMonth || 0;
+    const collected = Number(summary.collectedThisMonth || 0);
+    const billed = Number(summary.billedThisMonth || 0);
     if (!billed) return 0;
     return Math.round((collected / billed) * 100);
-  }, [billing]);
+  }, [summary]);
 
   const activeRatio = useMemo(() => {
-    const total = billing.summary.totalTenants || 0;
-    const active = billing.summary.activeSubscriptions || 0;
+    const total = Number(summary.totalTenants || 0);
+    const active = Number(summary.activeSubscriptions || 0);
     if (!total) return 0;
     return Math.round((active / total) * 100);
-  }, [billing]);
+  }, [summary]);
 
   const overdueRatio = useMemo(() => {
-    const total = billing.summary.totalTenants || 0;
-    const overdue = billing.summary.overdueTenants || 0;
+    const total = Number(summary.totalTenants || 0);
+    const overdue = Number(summary.overdueTenants || 0);
     if (!total) return 0;
     return Math.round((overdue / total) * 100);
-  }, [billing]);
+  }, [summary]);
 
   return (
     <Stack spacing={6}>
@@ -356,8 +263,7 @@ export default function BillingPage() {
         <Box>
           <Heading size="lg">Tenant Billing</Heading>
           <Text color="gray.500" mt={1}>
-            Manage subscription billing, GST invoices, renewals, collections,
-            and payment health across all tenants.
+            Manage subscription billing, GST invoices, renewals, collections, and payment health across all tenants.
           </Text>
         </Box>
 
@@ -375,7 +281,12 @@ export default function BillingPage() {
             <option value="this-year">This Year</option>
           </Select>
 
-          <Button leftIcon={<RefreshCw size={16} />} variant="outline">
+          <Button
+            leftIcon={<RefreshCw size={16} />}
+            variant="outline"
+            onClick={() => fetchBillingOverview({ silent: true, nextPeriod: period })}
+            isLoading={refreshing}
+          >
             Refresh
           </Button>
         </HStack>
@@ -384,45 +295,51 @@ export default function BillingPage() {
       <SimpleGrid columns={{ base: 1, sm: 2, xl: 3 }} spacing={4}>
         <MetricCard
           label="Monthly Recurring Revenue"
-          value={formatINR(billing.summary.mrr)}
-          helpText={`ARR: ${formatINR(billing.summary.arr)}`}
+          value={formatINR(summary.mrr)}
+          helpText={`ARR: ${formatINR(summary.arr)}`}
           icon={TrendingUp}
           color="green.500"
+          loading={loading}
         />
         <MetricCard
           label="Active Subscriptions"
-          value={billing.summary.activeSubscriptions}
-          helpText={`Out of ${billing.summary.totalTenants} total tenants`}
+          value={summary.activeSubscriptions ?? "—"}
+          helpText={`Out of ${summary.totalTenants ?? 0} total tenants`}
           icon={Users}
           color="blue.500"
+          loading={loading}
         />
         <MetricCard
-          label="Billed This Month"
-          value={formatINR(billing.summary.billedThisMonth)}
-          helpText={`Collected: ${formatINR(billing.summary.collectedThisMonth)}`}
+          label="Billed This Period"
+          value={formatINR(summary.billedThisMonth)}
+          helpText={`Collected: ${formatINR(summary.collectedThisMonth)}`}
           icon={CreditCard}
           color="purple.500"
+          loading={loading}
         />
         <MetricCard
           label="Outstanding Amount"
-          value={formatINR(billing.summary.outstandingAmount)}
-          helpText={`Overdue tenants: ${billing.summary.overdueTenants}`}
+          value={formatINR(summary.outstandingAmount)}
+          helpText={`Overdue tenants: ${summary.overdueTenants ?? 0}`}
           icon={AlertTriangle}
           color="red.500"
+          loading={loading}
         />
         <MetricCard
           label="GST Collected"
-          value={formatINR(billing.summary.gstCollectedThisMonth)}
+          value={formatINR(summary.gstCollectedThisMonth)}
           helpText="SaaS subscription tax collection"
           icon={ShieldCheck}
           color="orange.500"
+          loading={loading}
         />
         <MetricCard
           label="Suspended Tenants"
-          value={billing.summary.suspendedTenants}
+          value={summary.suspendedTenants ?? "—"}
           helpText="Tenants impacted by billing status"
           icon={Building2}
           color="gray.500"
+          loading={loading}
         />
       </SimpleGrid>
 
@@ -432,83 +349,92 @@ export default function BillingPage() {
             title="Subscription Health"
             subtitle={`Tenant billing health snapshot for ${period.replaceAll("-", " ")}`}
             rightAction={
-              <Badge colorScheme="green">Dummy Tenant Billing Data</Badge>
+              loading ? <Spinner size="sm" /> : <Badge colorScheme="green">Connected</Badge>
             }
           >
-            <Stack spacing={5}>
-              <Box>
-                <Flex justify="space-between" mb={2}>
-                  <Text fontSize="sm" color="gray.500">
-                    Active subscription ratio
-                  </Text>
-                  <Text fontSize="sm" fontWeight="600">
-                    {activeRatio}%
-                  </Text>
-                </Flex>
-                <Progress
-                  value={activeRatio}
-                  colorScheme={activeRatio >= 85 ? "green" : "orange"}
-                  borderRadius="full"
-                />
-              </Box>
-
-              <Box>
-                <Flex justify="space-between" mb={2}>
-                  <Text fontSize="sm" color="gray.500">
-                    Collection ratio
-                  </Text>
-                  <Text fontSize="sm" fontWeight="600">
-                    {collectionRatio}%
-                  </Text>
-                </Flex>
-                <Progress
-                  value={collectionRatio}
-                  colorScheme={collectionRatio >= 85 ? "green" : "orange"}
-                  borderRadius="full"
-                />
-              </Box>
-
-              <Box>
-                <Flex justify="space-between" mb={2}>
-                  <Text fontSize="sm" color="gray.500">
-                    Overdue tenant ratio
-                  </Text>
-                  <Text fontSize="sm" fontWeight="600">
-                    {overdueRatio}%
-                  </Text>
-                </Flex>
-                <Progress
-                  value={overdueRatio}
-                  colorScheme={overdueRatio >= 10 ? "red" : "green"}
-                  borderRadius="full"
-                />
-              </Box>
-
-              <Divider />
-
-              <Stack spacing={3}>
-                <InsightRow
-                  label="Active subscriptions"
-                  value={billing.summary.activeSubscriptions}
-                  tone="green"
-                />
-                <InsightRow
-                  label="Overdue tenants"
-                  value={billing.summary.overdueTenants}
-                  tone="red"
-                />
-                <InsightRow
-                  label="Suspended tenants"
-                  value={billing.summary.suspendedTenants}
-                  tone="purple"
-                />
-                <InsightRow
-                  label="Outstanding balance"
-                  value={formatINR(billing.summary.outstandingAmount)}
-                  tone="orange"
-                />
+            {loading ? (
+              <Stack spacing={4}>
+                <Skeleton height="20px" />
+                <Skeleton height="20px" />
+                <Skeleton height="20px" />
+                <Skeleton height="20px" />
               </Stack>
-            </Stack>
+            ) : (
+              <Stack spacing={5}>
+                <Box>
+                  <Flex justify="space-between" mb={2}>
+                    <Text fontSize="sm" color="gray.500">
+                      Active subscription ratio
+                    </Text>
+                    <Text fontSize="sm" fontWeight="600">
+                      {activeRatio}%
+                    </Text>
+                  </Flex>
+                  <Progress
+                    value={activeRatio}
+                    colorScheme={activeRatio >= 85 ? "green" : "orange"}
+                    borderRadius="full"
+                  />
+                </Box>
+
+                <Box>
+                  <Flex justify="space-between" mb={2}>
+                    <Text fontSize="sm" color="gray.500">
+                      Collection ratio
+                    </Text>
+                    <Text fontSize="sm" fontWeight="600">
+                      {collectionRatio}%
+                    </Text>
+                  </Flex>
+                  <Progress
+                    value={collectionRatio}
+                    colorScheme={collectionRatio >= 85 ? "green" : "orange"}
+                    borderRadius="full"
+                  />
+                </Box>
+
+                <Box>
+                  <Flex justify="space-between" mb={2}>
+                    <Text fontSize="sm" color="gray.500">
+                      Overdue tenant ratio
+                    </Text>
+                    <Text fontSize="sm" fontWeight="600">
+                      {overdueRatio}%
+                    </Text>
+                  </Flex>
+                  <Progress
+                    value={overdueRatio}
+                    colorScheme={overdueRatio >= 10 ? "red" : "green"}
+                    borderRadius="full"
+                  />
+                </Box>
+
+                <Divider />
+
+                <Stack spacing={3}>
+                  <InsightRow
+                    label="Active subscriptions"
+                    value={summary.activeSubscriptions ?? 0}
+                    tone="green"
+                  />
+                  <InsightRow
+                    label="Overdue tenants"
+                    value={summary.overdueTenants ?? 0}
+                    tone="red"
+                  />
+                  <InsightRow
+                    label="Suspended tenants"
+                    value={summary.suspendedTenants ?? 0}
+                    tone="purple"
+                  />
+                  <InsightRow
+                    label="Outstanding balance"
+                    value={formatINR(summary.outstandingAmount)}
+                    tone="orange"
+                  />
+                </Stack>
+              </Stack>
+            )}
           </SectionCard>
         </GridItem>
 
@@ -516,36 +442,38 @@ export default function BillingPage() {
           <SectionCard
             title="Plan Distribution"
             subtitle="MRR split by tenant subscription plan"
-            rightAction={
-              <Icon as={BadgeIndianRupee} color="purple.500" boxSize={5} />
-            }
+            rightAction={<Icon as={BadgeIndianRupee} color="purple.500" boxSize={5} />}
           >
-            <Stack spacing={5}>
-              {billing.plans.map((planItem) => {
-                const pct = Math.round(
-                  (planItem.mrr / billing.summary.mrr) * 100,
-                );
+            {loading ? (
+              <Stack spacing={4}>
+                <Skeleton height="48px" />
+                <Skeleton height="48px" />
+                <Skeleton height="48px" />
+              </Stack>
+            ) : (
+              <Stack spacing={5}>
+                {(billing.plans || []).map((planItem) => {
+                  const mrr = Number(planItem.mrr || 0);
+                  const totalMrr = Number(summary.mrr || 0);
+                  const pct = totalMrr ? Math.round((mrr / totalMrr) * 100) : 0;
 
-                return (
-                  <Box key={planItem.name}>
-                    <Flex justify="space-between" mb={2} align="center">
-                      <Box>
-                        <Text fontWeight="600">{planItem.name}</Text>
-                        <Text fontSize="sm" color="gray.500">
-                          {planItem.tenants} tenants
-                        </Text>
-                      </Box>
-                      <Text fontWeight="700">{formatINR(planItem.mrr)}</Text>
-                    </Flex>
-                    <Progress
-                      value={pct}
-                      colorScheme={planItem.color}
-                      borderRadius="full"
-                    />
-                  </Box>
-                );
-              })}
-            </Stack>
+                  return (
+                    <Box key={planItem.name}>
+                      <Flex justify="space-between" mb={2} align="center">
+                        <Box>
+                          <Text fontWeight="600">{planItem.name}</Text>
+                          <Text fontSize="sm" color="gray.500">
+                            {planItem.tenants} tenants
+                          </Text>
+                        </Box>
+                        <Text fontWeight="700">{formatINR(planItem.mrr)}</Text>
+                      </Flex>
+                      <Progress value={pct} colorScheme="blue" borderRadius="full" />
+                    </Box>
+                  );
+                })}
+              </Stack>
+            )}
           </SectionCard>
         </GridItem>
       </Grid>
@@ -576,6 +504,7 @@ export default function BillingPage() {
                 <option value="PENDING">PENDING</option>
                 <option value="OVERDUE">OVERDUE</option>
                 <option value="UNPAID">UNPAID</option>
+                <option value="PAST_DUE">PAST_DUE</option>
               </Select>
             </GridItem>
 
@@ -585,91 +514,104 @@ export default function BillingPage() {
                 value={plan}
                 onChange={(e) => setPlan(e.target.value)}
               >
-                <option value="Starter">Starter</option>
-                <option value="Growth">Growth</option>
-                <option value="Business">Business</option>
-                <option value="Enterprise">Enterprise</option>
+                {(billing.plans || []).map((planItem) => (
+                  <option key={planItem.name} value={planItem.name}>
+                    {planItem.name}
+                  </option>
+                ))}
               </Select>
             </GridItem>
           </Grid>
         </Stack>
 
         <Box overflowX="auto">
-          <Table variant="simple" size="md">
-            <Thead>
-              <Tr>
-                <Th>Tenant</Th>
-                <Th>Plan</Th>
-                <Th>Subscription</Th>
-                <Th>Payment</Th>
-                <Th isNumeric>MRR</Th>
-                <Th isNumeric>Cycle Bill</Th>
-                <Th isNumeric>Outstanding</Th>
-                <Th>Renewal</Th>
-              </Tr>
-            </Thead>
-            <Tbody>
-              {filteredTenants.map((tenant) => (
-                <Tr key={tenant.tenantId}>
-                  <Td>
-                    <Box>
-                      <Text fontWeight="600">{tenant.tenantName}</Text>
-                      <Text fontSize="xs" color="gray.500">
-                        {tenant.contactEmail}
-                      </Text>
-                      <Text fontSize="xs" color="gray.500">
-                        GSTIN: {tenant.gstin}
-                      </Text>
-                    </Box>
-                  </Td>
-                  <Td>
-                    <Box>
-                      <Badge colorScheme="blue">{tenant.plan}</Badge>
-                      <Text fontSize="xs" color="gray.500" mt={1}>
-                        {tenant.billingCycle}
-                      </Text>
-                    </Box>
-                  </Td>
-                  <Td>
-                    <Badge
-                      colorScheme={getStatusColor(tenant.subscriptionStatus)}
-                    >
-                      {tenant.subscriptionStatus}
-                    </Badge>
-                  </Td>
-                  <Td>
-                    <Badge colorScheme={getStatusColor(tenant.paymentStatus)}>
-                      {tenant.paymentStatus}
-                    </Badge>
-                  </Td>
-                  <Td isNumeric>{formatINR(tenant.mrr)}</Td>
-                  <Td isNumeric>
-                    <Box>
-                      <Text>{formatINR(tenant.billedThisCycle)}</Text>
-                      <Text fontSize="xs" color="gray.500">
-                        GST {tenant.gstRate}%
-                      </Text>
-                    </Box>
-                  </Td>
-                  <Td isNumeric>
-                    <Text
-                      color={tenant.outstanding > 0 ? "red.500" : "inherit"}
-                    >
-                      {formatINR(tenant.outstanding)}
-                    </Text>
-                  </Td>
-                  <Td>
-                    <Box>
-                      <Text>{tenant.nextRenewalDate}</Text>
-                      <Text fontSize="xs" color="gray.500">
-                        Last paid: {tenant.lastPaymentDate}
-                      </Text>
-                    </Box>
-                  </Td>
+          {loading ? (
+            <Stack spacing={4}>
+              <Skeleton height="56px" />
+              <Skeleton height="56px" />
+              <Skeleton height="56px" />
+              <Skeleton height="56px" />
+            </Stack>
+          ) : filteredTenants.length === 0 ? (
+            <Box py={10} textAlign="center">
+              <Text fontWeight="600">No tenant billing records found</Text>
+              <Text mt={1} color="gray.500">
+                Adjust filters or try a different search.
+              </Text>
+            </Box>
+          ) : (
+            <Table variant="simple" size="md">
+              <Thead>
+                <Tr>
+                  <Th>Tenant</Th>
+                  <Th>Plan</Th>
+                  <Th>Subscription</Th>
+                  <Th>Payment</Th>
+                  <Th isNumeric>MRR</Th>
+                  <Th isNumeric>Cycle Bill</Th>
+                  <Th isNumeric>Outstanding</Th>
+                  <Th>Renewal</Th>
                 </Tr>
-              ))}
-            </Tbody>
-          </Table>
+              </Thead>
+              <Tbody>
+                {filteredTenants.map((tenant) => (
+                  <Tr key={tenant.tenantId}>
+                    <Td>
+                      <Box>
+                        <Text fontWeight="600">{tenant.tenantName}</Text>
+                        <Text fontSize="xs" color="gray.500">
+                          {tenant.contactEmail || "—"}
+                        </Text>
+                        <Text fontSize="xs" color="gray.500">
+                          GSTIN: {tenant.gstin || "—"}
+                        </Text>
+                      </Box>
+                    </Td>
+                    <Td>
+                      <Box>
+                        <Badge colorScheme="blue">{tenant.plan || "—"}</Badge>
+                        <Text fontSize="xs" color="gray.500" mt={1}>
+                          {tenant.billingCycle || "—"}
+                        </Text>
+                      </Box>
+                    </Td>
+                    <Td>
+                      <Badge colorScheme={getStatusColor(tenant.subscriptionStatus)}>
+                        {tenant.subscriptionStatus || "—"}
+                      </Badge>
+                    </Td>
+                    <Td>
+                      <Badge colorScheme={getStatusColor(tenant.paymentStatus)}>
+                        {tenant.paymentStatus || "—"}
+                      </Badge>
+                    </Td>
+                    <Td isNumeric>{formatINR(tenant.mrr)}</Td>
+                    <Td isNumeric>
+                      <Box>
+                        <Text>{formatINR(tenant.billedThisCycle)}</Text>
+                        <Text fontSize="xs" color="gray.500">
+                          GST {tenant.gstRate ?? "—"}%
+                        </Text>
+                      </Box>
+                    </Td>
+                    <Td isNumeric>
+                      <Text color={Number(tenant.outstanding || 0) > 0 ? "red.500" : "inherit"}>
+                        {formatINR(tenant.outstanding)}
+                      </Text>
+                    </Td>
+                    <Td>
+                      <Box>
+                        <Text>{tenant.nextRenewalDate || "—"}</Text>
+                        <Text fontSize="xs" color="gray.500">
+                          Last paid: {tenant.lastPaymentDate || "—"}
+                        </Text>
+                      </Box>
+                    </Td>
+                  </Tr>
+                ))}
+              </Tbody>
+            </Table>
+          )}
         </Box>
       </SectionCard>
 
@@ -680,53 +622,63 @@ export default function BillingPage() {
             subtitle="Latest SaaS invoices issued to tenants"
             rightAction={<Icon as={FileText} color="orange.500" boxSize={5} />}
           >
-            <Table size="sm" variant="simple">
-              <Thead>
-                <Tr>
-                  <Th>Invoice</Th>
-                  <Th>Tenant</Th>
-                  <Th isNumeric>Amount</Th>
-                  <Th>Due</Th>
-                  <Th>Status</Th>
-                </Tr>
-              </Thead>
-              <Tbody>
-                {billing.recentInvoices.map((invoice) => (
-                  <Tr key={invoice.invoiceNo}>
-                    <Td>
-                      <Box>
-                        <Text fontWeight="600">{invoice.invoiceNo}</Text>
-                        <Text fontSize="xs" color="gray.500">
-                          Issued {invoice.issuedOn}
-                        </Text>
-                      </Box>
-                    </Td>
-                    <Td>
-                      <Box>
-                        <Text>{invoice.tenantName}</Text>
-                        <Text fontSize="xs" color="gray.500">
-                          Tenant #{invoice.tenantId}
-                        </Text>
-                      </Box>
-                    </Td>
-                    <Td isNumeric>
-                      <Box>
-                        <Text>{formatINR(invoice.amount)}</Text>
-                        <Text fontSize="xs" color="gray.500">
-                          GST {formatINR(invoice.gstAmount)}
-                        </Text>
-                      </Box>
-                    </Td>
-                    <Td>{invoice.dueOn}</Td>
-                    <Td>
-                      <Badge colorScheme={getStatusColor(invoice.status)}>
-                        {invoice.status}
-                      </Badge>
-                    </Td>
+            {loading ? (
+              <Stack spacing={4}>
+                <Skeleton height="48px" />
+                <Skeleton height="48px" />
+                <Skeleton height="48px" />
+              </Stack>
+            ) : (billing.recentInvoices || []).length === 0 ? (
+              <Text color="gray.500">No recent invoices available.</Text>
+            ) : (
+              <Table size="sm" variant="simple">
+                <Thead>
+                  <Tr>
+                    <Th>Invoice</Th>
+                    <Th>Tenant</Th>
+                    <Th isNumeric>Amount</Th>
+                    <Th>Due</Th>
+                    <Th>Status</Th>
                   </Tr>
-                ))}
-              </Tbody>
-            </Table>
+                </Thead>
+                <Tbody>
+                  {(billing.recentInvoices || []).map((invoice) => (
+                    <Tr key={invoice.invoiceNo}>
+                      <Td>
+                        <Box>
+                          <Text fontWeight="600">{invoice.invoiceNo}</Text>
+                          <Text fontSize="xs" color="gray.500">
+                            Issued {invoice.issuedOn || "—"}
+                          </Text>
+                        </Box>
+                      </Td>
+                      <Td>
+                        <Box>
+                          <Text>{invoice.tenantName || "—"}</Text>
+                          <Text fontSize="xs" color="gray.500">
+                            Tenant #{invoice.tenantId ?? "—"}
+                          </Text>
+                        </Box>
+                      </Td>
+                      <Td isNumeric>
+                        <Box>
+                          <Text>{formatINR(invoice.amount)}</Text>
+                          <Text fontSize="xs" color="gray.500">
+                            GST {formatINR(invoice.gstAmount)}
+                          </Text>
+                        </Box>
+                      </Td>
+                      <Td>{invoice.dueOn || "—"}</Td>
+                      <Td>
+                        <Badge colorScheme={getStatusColor(invoice.status)}>
+                          {invoice.status || "—"}
+                        </Badge>
+                      </Td>
+                    </Tr>
+                  ))}
+                </Tbody>
+              </Table>
+            )}
           </SectionCard>
         </GridItem>
 
@@ -734,38 +686,37 @@ export default function BillingPage() {
           <SectionCard
             title="Renewal Watchlist"
             subtitle="Tenants requiring close billing attention"
-            rightAction={
-              <Icon as={CalendarClock} color="red.500" boxSize={5} />
-            }
+            rightAction={<Icon as={CalendarClock} color="red.500" boxSize={5} />}
           >
-            <Stack spacing={4}>
-              {billing.tenants
-                .filter(
-                  (tenant) =>
-                    tenant.paymentStatus === "OVERDUE" ||
-                    tenant.paymentStatus === "PENDING" ||
-                    tenant.subscriptionStatus === "SUSPENDED",
-                )
-                .map((tenant) => (
+            {loading ? (
+              <Stack spacing={4}>
+                <Skeleton height="44px" />
+                <Skeleton height="44px" />
+                <Skeleton height="44px" />
+              </Stack>
+            ) : (billing.renewalWatchlist || []).length === 0 ? (
+              <Text color="gray.500">No watchlist items right now.</Text>
+            ) : (
+              <Stack spacing={4}>
+                {(billing.renewalWatchlist || []).map((tenant) => (
                   <Box key={tenant.tenantId}>
                     <HStack spacing={2} mb={1} flexWrap="wrap">
-                      <Text fontWeight="600">{tenant.tenantName}</Text>
-                      <Badge
-                        colorScheme={getStatusColor(tenant.subscriptionStatus)}
-                      >
-                        {tenant.subscriptionStatus}
+                      <Text fontWeight="600">{tenant.tenantName || "—"}</Text>
+                      <Badge colorScheme={getStatusColor(tenant.subscriptionStatus)}>
+                        {tenant.subscriptionStatus || "—"}
                       </Badge>
                       <Badge colorScheme={getStatusColor(tenant.paymentStatus)}>
-                        {tenant.paymentStatus}
+                        {tenant.paymentStatus || "—"}
                       </Badge>
                     </HStack>
                     <Text fontSize="sm" color="gray.500">
-                      Renewal: {tenant.nextRenewalDate} • Outstanding:{" "}
+                      Renewal: {tenant.nextRenewalDate || "—"} • Outstanding:{" "}
                       {formatINR(tenant.outstanding)}
                     </Text>
                   </Box>
                 ))}
-            </Stack>
+              </Stack>
+            )}
           </SectionCard>
         </GridItem>
       </Grid>

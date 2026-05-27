@@ -1,0 +1,432 @@
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  Badge,
+  Box,
+  Button,
+  Card,
+  CardBody,
+  Flex,
+  Heading,
+  HStack,
+  IconButton,
+  Input,
+  Select,
+  SimpleGrid,
+  Skeleton,
+  Stack,
+  Stat,
+  StatHelpText,
+  StatLabel,
+  StatNumber,
+  Table,
+  Tbody,
+  Td,
+  Text,
+  Th,
+  Thead,
+  Tr,
+  useDisclosure,
+  useToast,
+} from "@chakra-ui/react";
+import { Edit, Package, Plus, Power, RefreshCw } from "lucide-react";
+import ProductFormModal from "./ProductFormModal";
+import {
+  deactivateProduct,
+  getProducts,
+  getProductStats,
+  reactivateProduct,
+} from "./productApi";
+
+function formatCurrency(value) {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 2,
+  }).format(Number(value || 0));
+}
+
+function MetricCard({ label, value, helpText, loading = false }) {
+  return (
+    <Card borderWidth="1px" borderColor="gray.200" shadow="sm" borderRadius="xl">
+      <CardBody>
+        <Stat>
+          <StatLabel color="gray.500">{label}</StatLabel>
+          <StatNumber fontSize="2xl">
+            {loading ? <Skeleton height="30px" width="100px" /> : value}
+          </StatNumber>
+          <StatHelpText mb="0">
+            {loading ? <Skeleton height="16px" width="160px" /> : helpText}
+          </StatHelpText>
+        </Stat>
+      </CardBody>
+    </Card>
+  );
+}
+
+export default function ProductPage() {
+  const toast = useToast();
+  const { isOpen, onOpen, onClose } = useDisclosure();
+
+  const [products, setProducts] = useState([]);
+  const [stats, setStats] = useState({
+    total: 0,
+    active: 0,
+    inactive: 0,
+    recentProducts: [],
+  });
+
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [gstFilter, setGstFilter] = useState("");
+  const [unitFilter, setUnitFilter] = useState("");
+
+  const [selectedProduct, setSelectedProduct] = useState(null);
+
+  const loadPageData = async ({ silent = false } = {}) => {
+    if (silent) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+
+    try {
+      const [productsData, statsData] = await Promise.all([
+        getProducts(),
+        getProductStats(),
+      ]);
+
+      setProducts(productsData || []);
+      setStats(
+        statsData || {
+          total: 0,
+          active: 0,
+          inactive: 0,
+          recentProducts: [],
+        }
+      );
+    } catch (error) {
+      toast({
+        title: "Failed to load products",
+        description: error?.response?.data?.message || "Please try again.",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+    } finally {
+      if (silent) {
+        setRefreshing(false);
+      } else {
+        setLoading(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    loadPageData();
+  }, []);
+
+  const gstOptions = useMemo(() => {
+    return [...new Set(products.map((item) => item.gstRate).filter((v) => v !== null && v !== undefined))]
+      .sort((a, b) => Number(a) - Number(b));
+  }, [products]);
+
+  const unitOptions = useMemo(() => {
+    return [...new Set(products.map((item) => item.unitCode).filter(Boolean))].sort();
+  }, [products]);
+
+  const filteredProducts = useMemo(() => {
+    const q = query.trim().toLowerCase();
+
+    return products.filter((product) => {
+      const matchesQuery =
+        !q ||
+        String(product.code || "").toLowerCase().includes(q) ||
+        String(product.name || "").toLowerCase().includes(q) ||
+        String(product.description || "").toLowerCase().includes(q) ||
+        String(product.hsnSacCode || "").toLowerCase().includes(q) ||
+        String(product.hsnSacDescription || "").toLowerCase().includes(q) ||
+        String(product.unitCode || "").toLowerCase().includes(q) ||
+        String(product.gstSlabCode || "").toLowerCase().includes(q);
+
+      const matchesStatus =
+        !statusFilter ||
+        (statusFilter === "ACTIVE" && product.active) ||
+        (statusFilter === "INACTIVE" && !product.active);
+
+      const matchesGst =
+        !gstFilter || String(product.gstRate ?? "") === String(gstFilter);
+
+      const matchesUnit =
+        !unitFilter || String(product.unitCode || "") === String(unitFilter);
+
+      return matchesQuery && matchesStatus && matchesGst && matchesUnit;
+    });
+  }, [products, query, statusFilter, gstFilter, unitFilter]);
+
+  const handleCreate = () => {
+    setSelectedProduct(null);
+    onOpen();
+  };
+
+  const handleEdit = (product) => {
+    setSelectedProduct(product);
+    onOpen();
+  };
+
+  const handleModalClose = () => {
+    setSelectedProduct(null);
+    onClose();
+  };
+
+  const handleToggleStatus = async (product) => {
+    try {
+      if (product.active) {
+        await deactivateProduct(product.id);
+      } else {
+        await reactivateProduct(product.id);
+      }
+
+      toast({
+        title: product.active ? "Product deactivated" : "Product reactivated",
+        status: "success",
+        duration: 2500,
+        isClosable: true,
+      });
+
+      await loadPageData({ silent: true });
+    } catch (error) {
+      toast({
+        title: "Failed to update product status",
+        description: error?.response?.data?.message || "Please try again.",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  };
+
+  return (
+    <Stack spacing={6}>
+      <Flex
+        justify="space-between"
+        align={{ base: "stretch", md: "center" }}
+        direction={{ base: "column", md: "row" }}
+        gap={4}
+      >
+        <Box>
+          <Heading size="lg">Products</Heading>
+          <Text color="gray.500" mt={1}>
+            Manage tenant product catalog with standardized HSN/SAC, unit, and GST slab references.
+          </Text>
+        </Box>
+
+        <HStack spacing={3}>
+          <Button
+            leftIcon={<RefreshCw size={16} />}
+            variant="outline"
+            onClick={() => loadPageData({ silent: true })}
+            isLoading={refreshing}
+          >
+            Refresh
+          </Button>
+
+          <Button leftIcon={<Plus size={16} />} colorScheme="blue" onClick={handleCreate}>
+            New Product
+          </Button>
+        </HStack>
+      </Flex>
+
+      <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
+        <MetricCard
+          label="Total Products"
+          value={stats.total}
+          helpText="All products in your tenant catalog"
+          loading={loading}
+        />
+        <MetricCard
+          label="Active Products"
+          value={stats.active}
+          helpText="Available for new transactions"
+          loading={loading}
+        />
+        <MetricCard
+          label="Inactive Products"
+          value={stats.inactive}
+          helpText="Hidden from active usage"
+          loading={loading}
+        />
+      </SimpleGrid>
+
+      <Card borderWidth="1px" borderColor="gray.200" shadow="sm" borderRadius="xl">
+        <CardBody>
+          <Stack spacing={4}>
+            <SimpleGrid columns={{ base: 1, lg: 4 }} spacing={3}>
+              <Input
+                placeholder="Search by code, name, description, HSN/SAC, unit, GST slab"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+
+              <Select
+                placeholder="Filter by status"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <option value="ACTIVE">Active</option>
+                <option value="INACTIVE">Inactive</option>
+              </Select>
+
+              <Select
+                placeholder="Filter by GST rate"
+                value={gstFilter}
+                onChange={(e) => setGstFilter(e.target.value)}
+              >
+                {gstOptions.map((rate) => (
+                  <option key={String(rate)} value={String(rate)}>
+                    {Number(rate || 0).toFixed(2)}%
+                  </option>
+                ))}
+              </Select>
+
+              <Select
+                placeholder="Filter by unit"
+                value={unitFilter}
+                onChange={(e) => setUnitFilter(e.target.value)}
+              >
+                {unitOptions.map((unitCode) => (
+                  <option key={unitCode} value={unitCode}>
+                    {unitCode}
+                  </option>
+                ))}
+              </Select>
+            </SimpleGrid>
+
+            <Box overflowX="auto">
+              {loading ? (
+                <Stack spacing={3}>
+                  <Skeleton height="56px" />
+                  <Skeleton height="56px" />
+                  <Skeleton height="56px" />
+                  <Skeleton height="56px" />
+                </Stack>
+              ) : filteredProducts.length === 0 ? (
+                <Box py={10} textAlign="center">
+                  <Package size={28} />
+                  <Text fontWeight="600" mt={3}>
+                    No products found
+                  </Text>
+                  <Text color="gray.500" mt={1}>
+                    Create a product or adjust your filters.
+                  </Text>
+                </Box>
+              ) : (
+                <Table variant="simple" size="md">
+                  <Thead>
+                    <Tr>
+                      <Th>Code</Th>
+                      <Th>Name</Th>
+                      <Th>Description</Th>
+                      <Th>HSN/SAC</Th>
+                      <Th>Unit</Th>
+                      <Th>GST Slab</Th>
+                      <Th isNumeric>GST %</Th>
+                      <Th isNumeric>Default Price</Th>
+                      <Th>Status</Th>
+                      <Th>Actions</Th>
+                    </Tr>
+                  </Thead>
+                  <Tbody>
+                    {filteredProducts.map((product) => (
+                      <Tr key={product.id}>
+                        <Td>
+                          <Text fontWeight="700">{product.code}</Text>
+                        </Td>
+
+                        <Td>
+                          <Text fontWeight="600">{product.name}</Text>
+                        </Td>
+
+                        <Td maxW="280px">
+                          <Text noOfLines={2} color="gray.600">
+                            {product.description || "—"}
+                          </Text>
+                        </Td>
+
+                        <Td>
+                          <Stack spacing={0}>
+                            <Text fontWeight="600">{product.hsnSacCode || "—"}</Text>
+                            <Text fontSize="xs" color="gray.500" noOfLines={2}>
+                              {product.hsnSacDescription || ""}
+                            </Text>
+                          </Stack>
+                        </Td>
+
+                        <Td>
+                          <Stack spacing={0}>
+                            <Text fontWeight="600">{product.unitCode || "—"}</Text>
+                            <Text fontSize="xs" color="gray.500">
+                              {product.unitName || ""}
+                            </Text>
+                          </Stack>
+                        </Td>
+
+                        <Td>
+                          <Stack spacing={0}>
+                            <Text fontWeight="600">{product.gstSlabCode || "—"}</Text>
+                            <Text fontSize="xs" color="gray.500">
+                              {product.gstSlabName || ""}
+                            </Text>
+                          </Stack>
+                        </Td>
+
+                        <Td isNumeric>{Number(product.gstRate || 0).toFixed(2)}%</Td>
+
+                        <Td isNumeric>{formatCurrency(product.defaultPrice)}</Td>
+
+                        <Td>
+                          <Badge colorScheme={product.active ? "green" : "gray"}>
+                            {product.active ? "ACTIVE" : "INACTIVE"}
+                          </Badge>
+                        </Td>
+
+                        <Td>
+                          <HStack spacing={2}>
+                            <IconButton
+                              size="sm"
+                              variant="outline"
+                              icon={<Edit size={16} />}
+                              aria-label="Edit product"
+                              onClick={() => handleEdit(product)}
+                            />
+                            <IconButton
+                              size="sm"
+                              variant="outline"
+                              colorScheme={product.active ? "red" : "green"}
+                              icon={<Power size={16} />}
+                              aria-label={product.active ? "Deactivate product" : "Reactivate product"}
+                              onClick={() => handleToggleStatus(product)}
+                            />
+                          </HStack>
+                        </Td>
+                      </Tr>
+                    ))}
+                  </Tbody>
+                </Table>
+              )}
+            </Box>
+          </Stack>
+        </CardBody>
+      </Card>
+
+      <ProductFormModal
+        isOpen={isOpen}
+        onClose={handleModalClose}
+        onSuccess={() => loadPageData({ silent: true })}
+        product={selectedProduct}
+      />
+    </Stack>
+  );
+}

@@ -30,7 +30,7 @@ import RegisterPage from "../features/auth/RegisterPage";
  * =======================================================*/
 
 import Dashboard from "../pages/Dashboard";
-import ProductsPage from "../pages/ProductsPage";
+import ProductPage from "../features/product/ProductPage";
 import PartiesPage from "../pages/PartiesPage";
 import InvoicePage from "../pages/InvoicePage";
 import InvoiceCreatePage from "../pages/InvoiceCreatePage";
@@ -39,7 +39,6 @@ import InvoiceCreatePage from "../pages/InvoiceCreatePage";
  * Admin Pages
  * =======================================================*/
 
-import PlatformAdminDashboard from "../features/admin/PlatformAdminDashboard";
 import DashboardPage from "../features/admin/DashboardPage";
 import TenantPage from "../features/admin/TenantPage";
 import TenantDetailsPage from "../features/admin/TenantDetailsPage";
@@ -101,7 +100,7 @@ export default function AppRouter() {
         element={
           <ProtectedRoute>
             <AppLayout>
-              <ProductsPage />
+              <ProductPage />
             </AppLayout>
           </ProtectedRoute>
         }
