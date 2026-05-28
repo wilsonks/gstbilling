@@ -58,6 +58,10 @@ function InfoRow({ label, value, children }) {
   );
 }
 
+function formatCompanyType(type) {
+  return type ? type.replaceAll("_", " ") : "—";
+}
+
 export default function CompanyDetailsPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -332,6 +336,16 @@ export default function CompanyDetailsPage() {
                 <InfoRow label="Company Name" value={company.name} />
                 <Divider />
 
+                <InfoRow label="Legal Name">
+                  <Text fontWeight="500">{company.legalName || "—"}</Text>
+                </InfoRow>
+                <Divider />
+
+                <InfoRow label="Trade Name">
+                  <Text fontWeight="500">{company.tradeName || "—"}</Text>
+                </InfoRow>
+                <Divider />
+
                 <InfoRow label="GSTIN">
                   <HStack justify={{ base: "flex-start", md: "flex-end" }}>
                     <Hash size={14} />
@@ -351,9 +365,7 @@ export default function CompanyDetailsPage() {
                 <Divider />
 
                 <InfoRow label="Type">
-                  <Text fontWeight="500">
-                    {company.type?.replaceAll("_", " ") || "—"}
-                  </Text>
+                  <Text fontWeight="500">{formatCompanyType(company.type)}</Text>
                 </InfoRow>
                 <Divider />
 
@@ -373,11 +385,36 @@ export default function CompanyDetailsPage() {
                 </InfoRow>
                 <Divider />
 
-                <InfoRow label="Address">
+                <InfoRow label="Address Line 1">
                   <HStack justify={{ base: "flex-start", md: "flex-end" }}>
                     <MapPin size={14} />
-                    <Text fontWeight="500">{company.address || "—"}</Text>
+                    <Text fontWeight="500">{company.addressLine1 || "—"}</Text>
                   </HStack>
+                </InfoRow>
+                <Divider />
+
+                <InfoRow label="Address Line 2">
+                  <Text fontWeight="500">{company.addressLine2 || "—"}</Text>
+                </InfoRow>
+                <Divider />
+
+                <InfoRow label="City">
+                  <Text fontWeight="500">{company.city || "—"}</Text>
+                </InfoRow>
+                <Divider />
+
+                <InfoRow label="State">
+                  <Text fontWeight="500">{company.state || "—"}</Text>
+                </InfoRow>
+                <Divider />
+
+                <InfoRow label="Pincode">
+                  <Text fontWeight="500">{company.pincode || "—"}</Text>
+                </InfoRow>
+                <Divider />
+
+                <InfoRow label="Country">
+                  <Text fontWeight="500">{company.country || "—"}</Text>
                 </InfoRow>
               </CardBody>
             </Card>

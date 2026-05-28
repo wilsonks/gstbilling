@@ -1,0 +1,44 @@
+package com.wilsonks.gstbilling.invoice;
+
+import org.springframework.stereotype.Component;
+
+import java.math.BigDecimal;
+
+@Component
+public class InvoiceValidator {
+
+    public void validateForCreate(CreateInvoiceRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("Invoice payload is required");
+        }
+
+        if (request.getCustomerId() == null) {
+            throw new IllegalArgumentException("Customer is required");
+        }
+
+        if (request.getInvoiceDate() == null) {
+            throw new IllegalArgumentException("Invoice date is required");
+        }
+
+        if (request.getLines() == null || request.getLines().isEmpty()) {
+            throw new IllegalArgumentException("At least one invoice line is required");
+        }
+
+        int lineNo = 1;
+        for (CreateInvoiceLineRequest line : request.getLines()) {
+            if (line.getProductId() == null) {
+                throw new IllegalArgumentException("Product is required on line " + lineNo);
+            }
+
+            if (line.getQuantity() == null || line.getQuantity().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new IllegalArgumentException("Quantity must be greater than 0 on line " + lineNo);
+            }
+
+            if (line.getUnitPrice() == null || line.getUnitPrice().compareTo(BigDecimal.ZERO) < 0) {
+                throw new IllegalArgumentException("Unit price cannot be negative on line " + lineNo);
+            }
+
+            lineNo++;
+        }
+    }
+}

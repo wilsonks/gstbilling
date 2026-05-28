@@ -32,5 +32,9 @@ public class CompanyValidator {
 
         d.setStateCode(d.getGstin().substring(0, 2));
         d.setPan(d.getGstin().substring(2, 12));
+
+        if (d.getCountry() == null || d.getCountry().isBlank()) {
+            d.setCountry("India");
+        }
     }
 }

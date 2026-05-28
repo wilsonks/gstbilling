@@ -107,17 +107,29 @@ public class AuthService {
         );
 
         CompanyDto company = companyService.create(new CompanyDto(
-                null,
-                companyName,
-                gstin,
-                null,
-                null,
-                null,
-                email,
-                null,
-                null,
-                true,
-                tenant.getTenantId()
+                null, //Id
+                companyName, //Name
+                companyName, //Display name
+                companyName,// Trade name
+                gstin, //GSTIN
+                null, //PAN
+                null, //State code
+                null, //Address line 1
+                null, //Address line 2
+                null, //City
+                null, //State
+                null, //Pin code
+                null, //Country
+                email, //email
+                null, //Phone
+                null, //company type
+                true, //active
+                tenant.getTenantId(), //tenant id
+                null, //created at
+                null, //updated at
+                null, //created by
+                null, //updated by
+                null //version
         ));
 
         User user = User.builder()

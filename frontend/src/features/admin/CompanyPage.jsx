@@ -73,6 +73,23 @@ function getPageNumbers(currentPage, totalPages) {
   return [...pages].sort((a, b) => a - b);
 }
 
+function formatCompanyType(type) {
+  return type ? type.replaceAll("_", " ") : "—";
+}
+
+function formatAddress(company) {
+  const parts = [
+    company.addressLine1,
+    company.addressLine2,
+    company.city,
+    company.state,
+    company.pincode,
+    company.country,
+  ].filter(Boolean);
+
+  return parts.length > 0 ? parts.join(", ") : "—";
+}
+
 export default function CompanyPage() {
   const navigate = useNavigate();
   const toast = useToast();
@@ -168,7 +185,7 @@ export default function CompanyPage() {
           active: 0,
           inactive: 0,
           recentCompanies: [],
-        },
+        }
       );
     } catch (error) {
       setStats({
@@ -335,7 +352,7 @@ export default function CompanyPage() {
 
   const visiblePageNumbers = useMemo(
     () => getPageNumbers(pageInfo.number, pageInfo.totalPages),
-    [pageInfo.number, pageInfo.totalPages],
+    [pageInfo.number, pageInfo.totalPages]
   );
 
   const companyRows = useMemo(() => rows || [], [rows]);
@@ -359,7 +376,7 @@ export default function CompanyPage() {
         <Box>
           <Heading size="lg">Companies</Heading>
           <Text color="gray.500" mt={1}>
-            Manage tenant companies across the platform.
+            Manage tenant companies across the platform with invoice-ready seller details.
           </Text>
         </Box>
 
@@ -469,7 +486,9 @@ export default function CompanyPage() {
                   <Tr>
                     <Th>ID</Th>
                     <Th>Name</Th>
+                    <Th>Legal / Trade Name</Th>
                     <Th>GSTIN</Th>
+                    <Th>Location</Th>
                     <Th>Tenant ID</Th>
                     <Th>Type</Th>
                     <Th>Status</Th>
@@ -482,13 +501,27 @@ export default function CompanyPage() {
                     <Tr key={company.id}>
                       <Td>{company.id}</Td>
                       <Td fontWeight="600">{company.name}</Td>
-                      <Td>{company.gstin}</Td>
-                      <Td>{company.tenantId}</Td>
-                      <Td>{company.type?.replaceAll("_", " ") || "—"}</Td>
                       <Td>
-                        <Badge
-                          colorScheme={company.active ? "green" : "orange"}
-                        >
+                        <Stack spacing={0}>
+                          <Text fontWeight="500">{company.legalName || "—"}</Text>
+                          <Text fontSize="xs" color="gray.500">
+                            {company.tradeName || "—"}
+                          </Text>
+                        </Stack>
+                      </Td>
+                      <Td>{company.gstin}</Td>
+                      <Td maxW="260px">
+                        <Stack spacing={0}>
+                          <Text>{[company.city, company.state].filter(Boolean).join(", ") || "—"}</Text>
+                          <Text fontSize="xs" color="gray.500" noOfLines={2}>
+                            {formatAddress(company)}
+                          </Text>
+                        </Stack>
+                      </Td>
+                      <Td>{company.tenantId}</Td>
+                      <Td>{formatCompanyType(company.type)}</Td>
+                      <Td>
+                        <Badge colorScheme={company.active ? "green" : "orange"}>
                           {company.active ? "Active" : "Inactive"}
                         </Badge>
                       </Td>

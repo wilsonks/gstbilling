@@ -9,6 +9,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -26,16 +27,7 @@ public class CompanyService {
         }
 
         Company c = new Company();
-        c.setName(dto.getName());
-        c.setGstin(dto.getGstin());
-        c.setPan(dto.getPan());
-        c.setStateCode(dto.getStateCode());
-        c.setAddress(dto.getAddress());
-        c.setEmail(dto.getEmail());
-        c.setPhone(dto.getPhone());
-        c.setType(dto.getType());
-        c.setTenantId(dto.getTenantId());
-        c.setActive(dto.getActive() != null ? dto.getActive() : true);
+        mapToEntity(dto, c);
 
         try {
             return toDto(repo.save(c));
@@ -56,18 +48,7 @@ public class CompanyService {
             throw new CompanyException("Company with the same GSTIN already exists");
         }
 
-        c.setName(dto.getName());
-        c.setGstin(dto.getGstin());
-        c.setPan(dto.getPan());
-        c.setStateCode(dto.getStateCode());
-        c.setAddress(dto.getAddress());
-        c.setEmail(dto.getEmail());
-        c.setPhone(dto.getPhone());
-        c.setType(dto.getType());
-        c.setTenantId(dto.getTenantId());
-        if (dto.getActive() != null) {
-            c.setActive(dto.getActive());
-        }
+        mapToEntity(dto, c);
 
         try {
             return toDto(repo.save(c));
@@ -81,7 +62,6 @@ public class CompanyService {
                 .map(this::toDto)
                 .orElseThrow(() -> new NotFoundException("Company not found: " + id));
     }
-
 
     public Page<CompanyDto> list(String q, Pageable pageable) {
         if (q == null || q.isBlank()) {
@@ -141,17 +121,38 @@ public class CompanyService {
         if (dto.getName() != null) {
             dto.setName(dto.getName().trim());
         }
+        if (dto.getLegalName() != null) {
+            dto.setLegalName(dto.getLegalName().trim());
+        }
+        if (dto.getTradeName() != null) {
+            dto.setTradeName(dto.getTradeName().trim());
+        }
         if (dto.getGstin() != null) {
-            dto.setGstin(dto.getGstin().trim().toUpperCase());
+            dto.setGstin(dto.getGstin().trim().toUpperCase(Locale.ROOT));
         }
         if (dto.getEmail() != null) {
-            dto.setEmail(dto.getEmail().trim().toLowerCase());
-        }
-        if (dto.getAddress() != null) {
-            dto.setAddress(dto.getAddress().trim());
+            dto.setEmail(dto.getEmail().trim().toLowerCase(Locale.ROOT));
         }
         if (dto.getPhone() != null) {
             dto.setPhone(dto.getPhone().trim());
+        }
+        if (dto.getAddressLine1() != null) {
+            dto.setAddressLine1(dto.getAddressLine1().trim());
+        }
+        if (dto.getAddressLine2() != null) {
+            dto.setAddressLine2(dto.getAddressLine2().trim());
+        }
+        if (dto.getCity() != null) {
+            dto.setCity(dto.getCity().trim());
+        }
+        if (dto.getState() != null) {
+            dto.setState(dto.getState().trim());
+        }
+        if (dto.getPincode() != null) {
+            dto.setPincode(dto.getPincode().trim());
+        }
+        if (dto.getCountry() != null) {
+            dto.setCountry(dto.getCountry().trim());
         }
     }
 
@@ -159,22 +160,55 @@ public class CompanyService {
         if (gstin == null || gstin.isBlank()) {
             throw new CompanyException("GSTIN required");
         }
-        return gstin.trim().toUpperCase();
+        return gstin.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private void mapToEntity(CompanyDto dto, Company c) {
+        c.setName(dto.getName());
+        c.setLegalName(dto.getLegalName());
+        c.setTradeName(dto.getTradeName());
+        c.setGstin(dto.getGstin());
+        c.setPan(dto.getPan());
+        c.setStateCode(dto.getStateCode());
+        c.setAddressLine1(dto.getAddressLine1());
+        c.setAddressLine2(dto.getAddressLine2());
+        c.setCity(dto.getCity());
+        c.setState(dto.getState());
+        c.setPincode(dto.getPincode());
+        c.setCountry(dto.getCountry());
+        c.setEmail(dto.getEmail());
+        c.setPhone(dto.getPhone());
+        c.setType(dto.getType());
+        c.setTenantId(dto.getTenantId());
+        c.setActive(dto.getActive() != null ? dto.getActive() : true);
     }
 
     private CompanyDto toDto(Company c) {
         CompanyDto d = new CompanyDto();
         d.setId(c.getId());
         d.setName(c.getName());
+        d.setLegalName(c.getLegalName());
+        d.setTradeName(c.getTradeName());
         d.setGstin(c.getGstin());
         d.setPan(c.getPan());
         d.setStateCode(c.getStateCode());
-        d.setAddress(c.getAddress());
+        d.setAddressLine1(c.getAddressLine1());
+        d.setAddressLine2(c.getAddressLine2());
+        d.setCity(c.getCity());
+        d.setState(c.getState());
+        d.setPincode(c.getPincode());
+        d.setCountry(c.getCountry());
         d.setEmail(c.getEmail());
         d.setPhone(c.getPhone());
         d.setType(c.getType());
         d.setTenantId(c.getTenantId());
         d.setActive(c.isActive());
+
+        d.setCreatedAt(c.getCreatedAt());
+        d.setUpdatedAt(c.getUpdatedAt());
+        d.setCreatedBy(c.getCreatedBy());
+        d.setUpdatedBy(c.getUpdatedBy());
+        d.setVersion(c.getVersion());
         return d;
     }
 

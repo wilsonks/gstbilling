@@ -20,6 +20,12 @@ public class Company extends TenantScopedEntity {
     @Column(nullable = false, length = 200)
     private String name;
 
+    @Column(name = "legal_name", length = 200)
+    private String legalName;
+
+    @Column(name = "trade_name", length = 200)
+    private String tradeName;
+
     @Column(nullable = false, length = 15, unique = true)
     private String gstin;
 
@@ -32,8 +38,23 @@ public class Company extends TenantScopedEntity {
     @Column(length = 2)
     private String stateCode;
 
-    @Column(length = 500)
-    private String address;
+    @Column(name = "address_line1", length = 200)
+    private String addressLine1;
+
+    @Column(name = "address_line2", length = 200)
+    private String addressLine2;
+
+    @Column(length = 100)
+    private String city;
+
+    @Column(length = 100)
+    private String state;
+
+    @Column(length = 12)
+    private String pincode;
+
+    @Column(length = 100)
+    private String country;
 
     @Column(length = 20)
     private String phone;
@@ -43,5 +64,5 @@ public class Company extends TenantScopedEntity {
     private CompanyType type;
 
     @Column(nullable = false)
-    private boolean active = true;
+    private boolean active;
 }

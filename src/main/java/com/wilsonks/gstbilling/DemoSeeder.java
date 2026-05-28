@@ -8,6 +8,21 @@ import com.wilsonks.gstbilling.auth.identity.UserRepository;
 import com.wilsonks.gstbilling.auth.identity.UserScope;
 import com.wilsonks.gstbilling.company.Company;
 import com.wilsonks.gstbilling.company.CompanyRepository;
+import com.wilsonks.gstbilling.company.CompanyType;
+import com.wilsonks.gstbilling.customer.Customer;
+import com.wilsonks.gstbilling.customer.CustomerRepository;
+import com.wilsonks.gstbilling.customer.CustomerType;
+import com.wilsonks.gstbilling.customer.GstRegistrationType;
+import com.wilsonks.gstbilling.invoice.Invoice;
+import com.wilsonks.gstbilling.invoice.InvoiceLine;
+import com.wilsonks.gstbilling.invoice.InvoiceRepository;
+import com.wilsonks.gstbilling.invoice.InvoiceStatus;
+import com.wilsonks.gstbilling.invoice.TaxType;
+import com.wilsonks.gstbilling.invoice.sequence.DocumentType;
+import com.wilsonks.gstbilling.invoice.sequence.FinancialYearUtil;
+import com.wilsonks.gstbilling.invoice.sequence.InvoiceSequence;
+import com.wilsonks.gstbilling.invoice.sequence.InvoiceSequenceRepository;
+import com.wilsonks.gstbilling.invoice.sequence.SequenceResetPolicy;
 import com.wilsonks.gstbilling.master.gst.GstSlabMaster;
 import com.wilsonks.gstbilling.master.gst.GstSlabMasterRepository;
 import com.wilsonks.gstbilling.master.hsn.HsnSacMaster;
@@ -39,6 +54,7 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Component
@@ -60,6 +76,10 @@ public class DemoSeeder implements ApplicationRunner {
     private final HsnSacMasterRepository hsnSacMasterRepository;
     private final ProductRepository productRepository;
 
+    private final CustomerRepository customerRepository;
+    private final InvoiceSequenceRepository invoiceSequenceRepository;
+    private final InvoiceRepository invoiceRepository;
+
     @Override
     public void run(ApplicationArguments args) {
         seedMasters();
@@ -70,6 +90,8 @@ public class DemoSeeder implements ApplicationRunner {
                 "root@1234",
                 List.of("SUPER_ADMIN")
         );
+
+        String financialYear = FinancialYearUtil.currentFinancialYear();
 
         for (int i = 1; i <= 20; i++) {
             String tenantName = "Demo Tenant " + i;
@@ -96,10 +118,14 @@ public class DemoSeeder implements ApplicationRunner {
             upsertAccess(tenantAdmin.getId(), demoCompany.getId(), tenant.getTenantId(), Role.ADMIN);
 
             TenantSubscription subscription = upsertSubscription(tenant, i);
-            SubscriptionInvoice invoice = upsertLatestInvoice(subscription, tenant, i);
-            upsertPaymentForInvoice(invoice, tenant, i);
+            SubscriptionInvoice subscriptionInvoice = upsertLatestInvoice(subscription, tenant, i);
+            upsertPaymentForInvoice(subscriptionInvoice, tenant, i);
 
             seedProductsForTenant(tenant, i);
+
+            Customer customer = upsertDemoCustomer(tenant.getTenantId(), i);
+            upsertInvoiceSequence(tenant.getTenantId(), demoCompany.getId(), financialYear);
+            seedSampleInvoice(tenant.getTenantId(), demoCompany, customer, i, financialYear);
         }
     }
 
@@ -136,7 +162,7 @@ public class DemoSeeder implements ApplicationRunner {
         return stateCode + pan + entity + "Z5";
     }
 
-    private User upsertPlatformUser(
+    private void upsertPlatformUser(
             String username,
             String email,
             String rawPassword,
@@ -155,7 +181,7 @@ public class DemoSeeder implements ApplicationRunner {
         user.setTenantId(null);
         user.setRoles(roles);
 
-        return userRepo.save(user);
+        userRepo.save(user);
     }
 
     private Tenant upsertTenant(String name, String gstin, String contactEmail) {
@@ -201,17 +227,70 @@ public class DemoSeeder implements ApplicationRunner {
         Company company = companyRepo.findByGstin(gstin).orElseGet(Company::new);
 
         company.setName(name);
+        company.setLegalName(name + " Pvt Ltd");
+        company.setTradeName(name);
         company.setGstin(gstin);
         company.setEmail(email);
         company.setTenantId(tenantId);
         company.setActive(true);
+        company.setType(resolveCompanyType(tenantId));
+        company.setPhone("987654" + String.format("%04d", tenantId % 10000));
+        company.setAddressLine1("No. " + tenantId + ", GST Business Park");
+        company.setAddressLine2("Phase 1, Industrial Layout");
+        company.setCity(resolveCity(tenantId));
+        company.setState(resolveState(gstin));
+        company.setCountry("India");
 
         if (gstin != null && gstin.length() >= 12) {
             company.setStateCode(gstin.substring(0, 2));
             company.setPan(gstin.substring(2, 12));
         }
 
+        company.setPincode("560" + String.format("%03d", tenantId % 1000));
+
         return companyRepo.save(company);
+    }
+
+    private Customer upsertDemoCustomer(Long tenantId, int index) {
+        String code = "CUST-" + String.format("%03d", index);
+        String gstin = generateCustomerGstin(index);
+
+        Customer customer = customerRepository.findByTenantIdAndCodeIgnoreCase(tenantId, code)
+                .orElseGet(Customer::new);
+
+        customer.setTenantId(tenantId);
+        customer.setCode(code);
+        customer.setLegalName("Customer " + index + " Private Limited");
+        customer.setTradeName("Customer " + index);
+        customer.setCustomerType(CustomerType.BUSINESS);
+        customer.setGstRegistrationType(GstRegistrationType.REGISTERED);
+        customer.setGstin(gstin);
+        customer.setPan(gstin.substring(2, 12));
+        customer.setContactPerson("Accounts Manager " + index);
+        customer.setPhone("900000" + String.format("%04d", index));
+        customer.setEmail("customer" + index + "@mail.com");
+
+        customer.setBillingAddressLine1("Plot " + index + ", Tech Park");
+        customer.setBillingAddressLine2("Commercial Zone");
+        customer.setBillingCity(resolveCustomerCity(index));
+        customer.setBillingState(resolveState(gstin));
+        customer.setBillingStateCode(gstin.substring(0, 2));
+        customer.setBillingPincode("600" + String.format("%03d", index % 1000));
+        customer.setBillingCountry("India");
+
+        customer.setShippingSameAsBilling(true);
+        customer.setShippingAddressLine1(customer.getBillingAddressLine1());
+        customer.setShippingAddressLine2(customer.getBillingAddressLine2());
+        customer.setShippingCity(customer.getBillingCity());
+        customer.setShippingState(customer.getBillingState());
+        customer.setShippingStateCode(customer.getBillingStateCode());
+        customer.setShippingPincode(customer.getBillingPincode());
+        customer.setShippingCountry(customer.getBillingCountry());
+
+        customer.setPaymentTermsDays((index % 3 == 0) ? 15 : 30);
+        customer.setActive(true);
+
+        return customerRepository.save(customer);
     }
 
     private void upsertAccess(Long userId, Long companyId, Long tenantId, Role role) {
@@ -412,7 +491,237 @@ public class DemoSeeder implements ApplicationRunner {
         }
     }
 
-    private Product upsertProduct(
+    private void upsertInvoiceSequence(Long tenantId, Long companyId, String financialYear) {
+        InvoiceSequence existing = invoiceSequenceRepository
+                .findByTenantIdAndCompanyIdAndDocumentTypeAndFinancialYear(
+                        tenantId,
+                        companyId,
+                        DocumentType.TAX_INVOICE,
+                        financialYear
+                )
+                .orElseGet(InvoiceSequence::new);
+
+        existing.setTenantId(tenantId);
+        existing.setCompanyId(companyId);
+        existing.setDocumentType(DocumentType.TAX_INVOICE);
+        existing.setFinancialYear(financialYear);
+        existing.setPrefix("INV/" + financialYear + "/");
+        existing.setSuffix(null);
+        existing.setPaddingLength(5);
+        existing.setResetPolicy(SequenceResetPolicy.FINANCIAL_YEAR);
+        existing.setActive(true);
+
+        if (existing.getId() == null) {
+            existing.setCurrentNumber(0L);
+        }
+
+        invoiceSequenceRepository.save(existing);
+    }
+
+    private void seedSampleInvoice(
+            Long tenantId,
+            Company company,
+            Customer customer,
+            int index,
+            String financialYear
+    ) {
+        String invoiceNo = "INV/" + financialYear + "/" + String.format("%05d", index);
+
+        if (invoiceRepository.findByTenantIdAndCompanyIdAndInvoiceNo(tenantId, company.getId(), invoiceNo).isPresent()) {
+            return;
+        }
+
+        List<Product> products = productRepository.findByTenantId(tenantId);
+        if (products.isEmpty()) {
+            return;
+        }
+
+        Product firstProduct = products.get(0);
+        Product secondProduct = products.size() > 1 ? products.get(1) : products.get(0);
+
+        HsnSacMaster firstHsn = hsnSacMasterRepository.findById(firstProduct.getHsnSacId())
+                .orElseThrow(() -> new IllegalStateException("HSN/SAC missing for product " + firstProduct.getId()));
+        UnitMaster firstUnit = unitMasterRepository.findById(firstProduct.getUnitId())
+                .orElseThrow(() -> new IllegalStateException("Unit missing for product " + firstProduct.getId()));
+        GstSlabMaster firstSlab = gstSlabMasterRepository.findById(firstProduct.getGstSlabId())
+                .orElseThrow(() -> new IllegalStateException("GST slab missing for product " + firstProduct.getId()));
+
+        HsnSacMaster secondHsn = hsnSacMasterRepository.findById(secondProduct.getHsnSacId())
+                .orElseThrow(() -> new IllegalStateException("HSN/SAC missing for product " + secondProduct.getId()));
+        UnitMaster secondUnit = unitMasterRepository.findById(secondProduct.getUnitId())
+                .orElseThrow(() -> new IllegalStateException("Unit missing for product " + secondProduct.getId()));
+        GstSlabMaster secondSlab = gstSlabMasterRepository.findById(secondProduct.getGstSlabId())
+                .orElseThrow(() -> new IllegalStateException("GST slab missing for product " + secondProduct.getId()));
+
+        TaxType taxType = resolveTaxType(company.getStateCode(), customer.getBillingStateCode(), customer.getGstin());
+
+        Invoice invoice = new Invoice();
+        invoice.setTenantId(tenantId);
+        invoice.setCompanyId(company.getId());
+        invoice.setInvoiceNo(invoiceNo);
+        invoice.setInvoiceDate(LocalDate.now().minusDays(index % 10));
+        invoice.setDueDate(invoice.getInvoiceDate().plusDays(customer.getPaymentTermsDays()));
+        invoice.setStatus(index % 7 == 0 ? InvoiceStatus.CANCELLED : InvoiceStatus.ISSUED);
+        invoice.setTaxType(taxType);
+        invoice.setPlaceOfSupplyStateCode(customer.getBillingStateCode());
+        invoice.setNotes("Demo invoice generated by seed data");
+        invoice.setTermsAndConditions("Payment due within agreed credit period.");
+
+        snapshotCustomer(invoice, customer);
+        snapshotSeller(invoice, company);
+
+        List<InvoiceLine> lines = new ArrayList<>();
+        lines.add(buildInvoiceLine(
+                invoice,
+                1,
+                firstProduct,
+                firstHsn,
+                firstUnit,
+                firstSlab,
+                new BigDecimal("1.000"),
+                firstProduct.getDefaultPrice(),
+                taxType
+        ));
+
+        lines.add(buildInvoiceLine(
+                invoice,
+                2,
+                secondProduct,
+                secondHsn,
+                secondUnit,
+                secondSlab,
+                new BigDecimal(index % 2 == 0 ? "2.000" : "1.000"),
+                secondProduct.getDefaultPrice(),
+                taxType
+        ));
+
+        invoice.replaceLines(lines);
+
+        BigDecimal totalTaxable = money(BigDecimal.ZERO);
+        BigDecimal totalSgst = money(BigDecimal.ZERO);
+        BigDecimal totalCgst = money(BigDecimal.ZERO);
+        BigDecimal totalIgst = money(BigDecimal.ZERO);
+
+        for (InvoiceLine line : lines) {
+            totalTaxable = totalTaxable.add(line.getTaxableAmount());
+            totalCgst = totalCgst.add(line.getCgstAmount());
+            totalSgst = totalSgst.add(line.getSgstAmount());
+            totalIgst = totalIgst.add(line.getIgstAmount());
+        }
+
+        BigDecimal totalTax = totalCgst.add(totalSgst).add(totalIgst);
+        BigDecimal totalInvoiceAmount = totalTaxable.add(totalTax);
+
+        invoice.setTotalTaxableAmount(totalTaxable);
+        invoice.setTotalCgstAmount(totalCgst);
+        invoice.setTotalSgstAmount(totalSgst);
+        invoice.setTotalIgstAmount(totalIgst);
+        invoice.setTotalTaxAmount(totalTax);
+        invoice.setTotalInvoiceAmount(totalInvoiceAmount);
+
+        invoiceRepository.save(invoice);
+
+        InvoiceSequence sequence = invoiceSequenceRepository
+                .findByTenantIdAndCompanyIdAndDocumentTypeAndFinancialYear(
+                        tenantId,
+                        company.getId(),
+                        DocumentType.TAX_INVOICE,
+                        financialYear
+                )
+                .orElseThrow(() -> new IllegalStateException("Invoice sequence missing"));
+
+        long expectedCurrent = Math.max(sequence.getCurrentNumber(), index);
+        sequence.setCurrentNumber(expectedCurrent);
+        invoiceSequenceRepository.save(sequence);
+    }
+
+    private InvoiceLine buildInvoiceLine(
+            Invoice invoice,
+            int lineNo,
+            Product product,
+            HsnSacMaster hsnSac,
+            UnitMaster unit,
+            GstSlabMaster slab,
+            BigDecimal quantity,
+            BigDecimal unitPrice,
+            TaxType taxType
+    ) {
+        BigDecimal qty = quantity.setScale(3, BigDecimal.ROUND_HALF_UP);
+        BigDecimal price = money(unitPrice);
+        BigDecimal taxable = money(qty.multiply(price));
+
+        BigDecimal gstRate = slab.getRate().setScale(2, BigDecimal.ROUND_HALF_UP);
+        BigDecimal cgstRate = BigDecimal.ZERO.setScale(2, BigDecimal.ROUND_HALF_UP);
+        BigDecimal sgstRate = BigDecimal.ZERO.setScale(2, BigDecimal.ROUND_HALF_UP);
+        BigDecimal igstRate = BigDecimal.ZERO.setScale(2, BigDecimal.ROUND_HALF_UP);
+
+        if (taxType == TaxType.INTRA_STATE) {
+            cgstRate = gstRate.divide(new BigDecimal("2"), 2, BigDecimal.ROUND_HALF_UP);
+            sgstRate = gstRate.divide(new BigDecimal("2"), 2, BigDecimal.ROUND_HALF_UP);
+        } else if (taxType == TaxType.INTER_STATE) {
+            igstRate = gstRate;
+        }
+
+        BigDecimal cgstAmount = percentOf(taxable, cgstRate);
+        BigDecimal sgstAmount = percentOf(taxable, sgstRate);
+        BigDecimal igstAmount = percentOf(taxable, igstRate);
+        BigDecimal lineTotal = taxable.add(cgstAmount).add(sgstAmount).add(igstAmount);
+
+        return InvoiceLine.builder()
+                .invoice(invoice)
+                .lineNo(lineNo)
+                .productId(product.getId())
+                .productCode(product.getCode())
+                .productName(product.getName())
+                .description(product.getDescription())
+                .hsnSacCode(hsnSac.getCode())
+                .unitCode(unit.getCode())
+                .quantity(qty)
+                .unitPrice(price)
+                .taxableAmount(taxable)
+                .gstRate(gstRate)
+                .cgstRate(cgstRate)
+                .sgstRate(sgstRate)
+                .igstRate(igstRate)
+                .cgstAmount(cgstAmount)
+                .sgstAmount(sgstAmount)
+                .igstAmount(igstAmount)
+                .lineTotalAmount(lineTotal)
+                .build();
+    }
+
+    private void snapshotCustomer(Invoice invoice, Customer customer) {
+        invoice.setCustomerId(customer.getId());
+        invoice.setCustomerCode(customer.getCode());
+        invoice.setCustomerLegalName(customer.getLegalName());
+        invoice.setCustomerTradeName(customer.getTradeName());
+        invoice.setCustomerGstin(customer.getGstin());
+        invoice.setCustomerBillingAddressLine1(customer.getBillingAddressLine1());
+        invoice.setCustomerBillingAddressLine2(customer.getBillingAddressLine2());
+        invoice.setCustomerBillingCity(customer.getBillingCity());
+        invoice.setCustomerBillingState(customer.getBillingState());
+        invoice.setCustomerBillingStateCode(customer.getBillingStateCode());
+        invoice.setCustomerBillingPincode(customer.getBillingPincode());
+        invoice.setCustomerBillingCountry(customer.getBillingCountry());
+    }
+
+    private void snapshotSeller(Invoice invoice, Company company) {
+        invoice.setSellerLegalName(
+                company.getLegalName() != null && !company.getLegalName().isBlank()
+                        ? company.getLegalName()
+                        : company.getName()
+        );
+        invoice.setSellerGstin(company.getGstin());
+        invoice.setSellerAddressLine1(company.getAddressLine1());
+        invoice.setSellerAddressLine2(company.getAddressLine2());
+        invoice.setSellerCity(company.getCity());
+        invoice.setSellerState(company.getState());
+        invoice.setSellerStateCode(company.getStateCode());
+        invoice.setSellerPincode(company.getPincode());
+        invoice.setSellerCountry(company.getCountry());
+    }
+
+    private void upsertProduct(
             Long tenantId,
             String code,
             String name,
@@ -436,7 +745,7 @@ public class DemoSeeder implements ApplicationRunner {
         product.setGstSlabId(gstSlab.getId());
         product.setActive(active);
 
-        return productRepository.save(product);
+        productRepository.save(product);
     }
 
     private GstSlabMaster upsertGstSlab(String code, String name, BigDecimal rate) {
@@ -451,7 +760,7 @@ public class DemoSeeder implements ApplicationRunner {
         return gstSlabMasterRepository.save(slab);
     }
 
-    private UnitMaster upsertUnit(String code, String name, String symbol) {
+    private void upsertUnit(String code, String name, String symbol) {
         UnitMaster unit = unitMasterRepository.findByCodeIgnoreCase(code)
                 .orElseGet(UnitMaster::new);
 
@@ -460,10 +769,10 @@ public class DemoSeeder implements ApplicationRunner {
         unit.setSymbol(symbol);
         unit.setActive(true);
 
-        return unitMasterRepository.save(unit);
+        unitMasterRepository.save(unit);
     }
 
-    private HsnSacMaster upsertHsnSac(
+    private void upsertHsnSac(
             String code,
             String description,
             HsnSacType type,
@@ -478,7 +787,7 @@ public class DemoSeeder implements ApplicationRunner {
         hsnSac.setDefaultGstSlab(defaultGstSlab);
         hsnSac.setActive(true);
 
-        return hsnSacMasterRepository.save(hsnSac);
+        hsnSacMasterRepository.save(hsnSac);
     }
 
     private UnitMaster getUnitByCode(String code) {
@@ -489,6 +798,74 @@ public class DemoSeeder implements ApplicationRunner {
     private HsnSacMaster getHsnSacByCode(String code) {
         return hsnSacMasterRepository.findByCodeIgnoreCase(code)
                 .orElseThrow(() -> new IllegalStateException("HSN/SAC not found: " + code));
+    }
+
+    private CompanyType resolveCompanyType(Long tenantId) {
+        int mod = (int) (tenantId % 4);
+        return switch (mod) {
+            case 0 -> CompanyType.PRIVATE_LIMITED;
+            case 1 -> CompanyType.LLP;
+            case 2 -> CompanyType.PARTNERSHIP;
+            default -> CompanyType.PROPRIETORSHIP;
+        };
+    }
+
+    private String resolveCity(Long tenantId) {
+        return switch ((int) (tenantId % 5)) {
+            case 0 -> "Bengaluru";
+            case 1 -> "Hyderabad";
+            case 2 -> "Chennai";
+            case 3 -> "Pune";
+            default -> "Mumbai";
+        };
+    }
+
+    private String resolveCustomerCity(int index) {
+        return switch (index % 5) {
+            case 0 -> "Bengaluru";
+            case 1 -> "Hyderabad";
+            case 2 -> "Chennai";
+            case 3 -> "Pune";
+            default -> "Mumbai";
+        };
+    }
+
+    private String resolveState(String gstin) {
+        if (gstin == null || gstin.length() < 2) {
+            return "Karnataka";
+        }
+
+        return switch (gstin.substring(0, 2)) {
+            case "27" -> "Maharashtra";
+            case "29" -> "Karnataka";
+            case "33" -> "Tamil Nadu";
+            case "36" -> "Telangana";
+            case "32" -> "Kerala";
+            default -> "Andhra Pradesh";
+        };
+    }
+
+    private String generateCustomerGstin(int index) {
+        String[] stateCodes = {"27", "29", "33", "36", "32"};
+        String stateCode = stateCodes[index % stateCodes.length];
+        String pan = String.format("CUSTM%04dF", index);
+        String entity = String.valueOf((index % 9) + 1);
+        return stateCode + pan + entity + "Z5";
+    }
+
+    private TaxType resolveTaxType(String sellerStateCode, String buyerStateCode, String buyerGstin) {
+        if (buyerGstin == null || buyerGstin.isBlank()) {
+            if (sellerStateCode != null && sellerStateCode.equalsIgnoreCase(buyerStateCode)) {
+                return TaxType.INTRA_STATE;
+            }
+            return TaxType.INTER_STATE;
+        }
+
+        if (sellerStateCode != null && sellerStateCode.equalsIgnoreCase(buyerStateCode)) {
+            return TaxType.INTRA_STATE;
+        }
+
+        return TaxType.INTER_STATE;
     }
 
     private PlanSeed resolvePlan(int index) {
@@ -578,6 +955,14 @@ public class DemoSeeder implements ApplicationRunner {
 
     private BigDecimal defaultAmount(BigDecimal value) {
         return value != null ? value : BigDecimal.ZERO;
+    }
+
+    private BigDecimal money(BigDecimal value) {
+        return (value != null ? value : BigDecimal.ZERO).setScale(2, BigDecimal.ROUND_HALF_UP);
+    }
+
+    private BigDecimal percentOf(BigDecimal base, BigDecimal rate) {
+        return money(base.multiply(rate).divide(new BigDecimal("100"), 2, BigDecimal.ROUND_HALF_UP));
     }
 
     private record PlanSeed(
