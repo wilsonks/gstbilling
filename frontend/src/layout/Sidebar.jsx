@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, VStack, Text } from "@chakra-ui/react";
+import { Box, VStack, Text, Divider } from "@chakra-ui/react";
 import { useNavigate, useLocation } from "react-router-dom";
 
 export default function Sidebar({ onNavigate }) {
@@ -11,8 +11,19 @@ export default function Sidebar({ onNavigate }) {
     onNavigate?.();
   };
 
+  const isActive = (path) => {
+    if (path === "/dashboard") {
+      return location.pathname === "/dashboard";
+    }
+
+    return (
+      location.pathname === path ||
+      location.pathname.startsWith(`${path}/`)
+    );
+  };
+
   const Item = ({ label, path }) => {
-    const active = location.pathname.startsWith(path);
+    const active = isActive(path);
 
     return (
       <Box
@@ -24,9 +35,7 @@ export default function Sidebar({ onNavigate }) {
         _hover={{ bg: "gray.100" }}
         onClick={() => go(path)}
       >
-        <Text fontWeight={active ? "600" : "400"}>
-          {label}
-        </Text>
+        <Text fontWeight={active ? "600" : "400"}>{label}</Text>
       </Box>
     );
   };
@@ -44,11 +53,34 @@ export default function Sidebar({ onNavigate }) {
         GST Billing
       </Text>
 
-      <VStack align="stretch" spacing={2}>
+      <Text color="gray.500" fontSize="xs" mb={2}>
+        OVERVIEW
+      </Text>
+      <VStack align="stretch" spacing={2} mb={4}>
         <Item label="Dashboard" path="/dashboard" />
-        <Item label="Invoices" path="/invoice" />
+      </VStack>
+
+      <Divider my={4} />
+
+      <Text color="gray.500" fontSize="xs" mb={2}>
+        MASTER DATA
+      </Text>
+      <VStack align="stretch" spacing={2} mb={4}>
+        <Item label="Companies" path="/companies" />
+        <Item label="Users" path="/users" />
+        <Item label="User Access" path="/user-access" />
         <Item label="Products" path="/products" />
-        <Item label="Parties" path="/parties" />
+        <Item label="Customers" path="/customers" />
+        <Item label="Invoice Sequences" path="/invoice-sequences" />
+      </VStack>
+
+      <Divider my={4} />
+
+      <Text color="gray.500" fontSize="xs" mb={2}>
+        TRANSACTIONS
+      </Text>
+      <VStack align="stretch" spacing={2}>
+        <Item label="Invoices" path="/invoices" />
       </VStack>
     </Box>
   );

@@ -1,44 +1,41 @@
 import React from "react";
-
 import { Routes, Route, Navigate } from "react-router-dom";
-
 import { useSelector } from "react-redux";
 
 /* =========================================================
  * Layouts
  * =======================================================*/
-
 import AppLayout from "../layout/AppLayout";
 import AdminLayout from "../layout/AdminLayout";
 
 /* =========================================================
  * Route Guards
  * =======================================================*/
-
 import ProtectedRoute from "./ProtectedRoute";
 import PlatformRoute from "./PlatformRoute";
 
 /* =========================================================
  * Auth
  * =======================================================*/
-
 import LoginPage from "../features/auth/LoginPage";
 import RegisterPage from "../features/auth/RegisterPage";
 
 /* =========================================================
  * Tenant Pages
  * =======================================================*/
-
-import Dashboard from "../pages/Dashboard";
+import TenantDashboardPage from "../features/tenant/TenantDashboardPage";
+import TenantCompanyPage from "../features/company/TenantCompanyPage";
 import ProductPage from "../features/product/ProductPage";
+import CustomerPage from "../features/customer/CustomerPage";
+import InvoiceSequencePage from "../features/invoice-sequence/InvoiceSequencePage";
+import InvoicePage from "../features/invoice/InvoicePage";
+import InvoiceCreatePage from "../features/invoice/InvoiceCreatePage";
+import InvoiceDetailsPage from "../features/invoice/InvoiceDetailsPage";
 import PartiesPage from "../pages/PartiesPage";
-import InvoicePage from "../pages/InvoicePage";
-import InvoiceCreatePage from "../pages/InvoiceCreatePage";
 
 /* =========================================================
  * Admin Pages
  * =======================================================*/
-
 import DashboardPage from "../features/admin/DashboardPage";
 import TenantPage from "../features/admin/TenantPage";
 import TenantDetailsPage from "../features/admin/TenantDetailsPage";
@@ -50,14 +47,24 @@ import UserAccessPage from "../features/admin/UserAccessPage";
 import UserAccessDetailsPage from "../features/admin/UserAccessDetailsPage";
 import AuditLogsPage from "../features/admin/AuditLogsPage";
 import AuditLogDetailsModal from "../features/admin/AuditLogDetailsModal";
-import AdminMetricsPage from "../features/admin/AdminMetricsPage";
 import MetricsPage from "../features/admin/MetricsPage";
 import BillingPage from "../features/admin/BillingPage";
 
 /* =========================================================
+ * Temporary Tenant Placeholder Reuse
+ * Replace these with dedicated tenant pages as you build them.
+ * =======================================================*/
+const TenantCompaniesPage = TenantCompanyPage;
+const TenantUsersPage = PartiesPage;
+const TenantUserAccessPage = PartiesPage;
+const TenantCustomersPage = CustomerPage;
+const TenantInvoiceSequencePage = InvoiceSequencePage;
+const TenantInvoicePage = InvoicePage;
+const TenantInvoiceCreatePage = InvoiceCreatePage;
+const TenantInvoiceDetailsPage = InvoiceDetailsPage;
+/* =========================================================
  * Router
  * =======================================================*/
-
 export default function AppRouter() {
   const { accessToken, scope } = useSelector((state) => state.auth);
 
@@ -90,11 +97,45 @@ export default function AppRouter() {
         element={
           <ProtectedRoute>
             <AppLayout>
-              <Dashboard />
+              <TenantDashboardPage />
             </AppLayout>
           </ProtectedRoute>
         }
       />
+
+      <Route
+        path="/companies"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <TenantCompaniesPage />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/users"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <TenantUsersPage />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/user-access"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <TenantUserAccessPage />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+
       <Route
         path="/products"
         element={
@@ -105,36 +146,70 @@ export default function AppRouter() {
           </ProtectedRoute>
         }
       />
+
       <Route
-        path="/parties"
+        path="/customers"
         element={
           <ProtectedRoute>
             <AppLayout>
-              <PartiesPage />
+              <TenantCustomersPage />
             </AppLayout>
           </ProtectedRoute>
         }
       />
+
       <Route
-        path="/invoice"
+        path="/invoice-sequences"
         element={
           <ProtectedRoute>
             <AppLayout>
-              <InvoicePage />
+              <TenantInvoiceSequencePage />
             </AppLayout>
           </ProtectedRoute>
         }
       />
+
+      <Route
+        path="/invoices"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <TenantInvoicePage />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/invoices/new"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <TenantInvoiceCreatePage />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/invoices/:id"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <TenantInvoiceDetailsPage />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Backward compatibility redirects */}
+      <Route path="/invoice" element={<Navigate to="/invoices" replace />} />
       <Route
         path="/invoice/new"
-        element={
-          <ProtectedRoute>
-            <AppLayout>
-              <InvoiceCreatePage />
-            </AppLayout>
-          </ProtectedRoute>
-        }
+        element={<Navigate to="/invoices/new" replace />}
       />
+      <Route path="/parties" element={<Navigate to="/customers" replace />} />
+
       {/* =====================================================
        * Platform Admin Routes
        * ===================================================*/}
@@ -303,6 +378,7 @@ export default function AppRouter() {
           </ProtectedRoute>
         }
       />
+
       {/* =====================================================
        * 404 / Unknown Routes
        * ===================================================*/}

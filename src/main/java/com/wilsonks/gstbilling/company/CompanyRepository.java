@@ -31,4 +31,26 @@ public interface CompanyRepository extends JpaRepository<Company, Long> {
 
 
     List<Company> findTop5ByOrderByUpdatedAtDesc();
+
+
+    // For tenant-specific queries
+    // Tenant scoped
+    Optional<Company> findByIdAndTenantId(Long id, Long tenantId);
+
+    Page<Company> findByTenantId(Long tenantId, Pageable pageable);
+
+    Page<Company> findByTenantIdAndNameContainingIgnoreCaseOrTenantIdAndGstinContainingIgnoreCase(
+            Long tenantId1,
+            String name,
+            Long tenantId2,
+            String gstin,
+            Pageable pageable
+    );
+
+    long countByTenantId(Long tenantId);
+
+    long countByTenantIdAndActiveTrue(Long tenantId);
+
+    List<Company> findTop5ByTenantIdOrderByUpdatedAtDesc(Long tenantId);
+
 }

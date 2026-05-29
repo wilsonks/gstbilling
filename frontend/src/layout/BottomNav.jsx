@@ -1,11 +1,6 @@
-import React from 'react'
+import React from "react";
 import { Flex, Box, Text } from "@chakra-ui/react";
-
-import {
-  useNavigate,
-  useLocation,
-} from "react-router-dom";
-
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   Home,
   FileText,
@@ -18,9 +13,9 @@ import {
 
 const tenantItems = [
   { label: "Home", path: "/dashboard", icon: Home },
-  { label: "Invoices", path: "/invoice", icon: FileText },
+  { label: "Invoices", path: "/invoices", icon: FileText },
   { label: "Products", path: "/products", icon: Package },
-  { label: "Parties", path: "/parties", icon: Users },
+  { label: "Customers", path: "/customers", icon: Users },
 ];
 
 const adminItems = [
@@ -29,16 +24,13 @@ const adminItems = [
   { label: "Users", path: "/admin/users", icon: UserCog },
 ];
 
-const hiddenRoutes = ["/invoice/new"];
+const hiddenRoutes = ["/invoices/new"];
 
 export default function BottomNav({ type = "tenant" }) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const items =
-    type === "admin"
-      ? adminItems
-      : tenantItems;
+  const items = type === "admin" ? adminItems : tenantItems;
 
   const shouldHide = hiddenRoutes.some((route) =>
     location.pathname.startsWith(route)
@@ -46,8 +38,16 @@ export default function BottomNav({ type = "tenant" }) {
 
   if (shouldHide) return null;
 
-  const isActive = (path) =>
-    location.pathname.startsWith(path);
+  const isActive = (path) => {
+    if (path === "/dashboard" || path === "/admin") {
+      return location.pathname === path;
+    }
+
+    return (
+      location.pathname === path ||
+      location.pathname.startsWith(`${path}/`)
+    );
+  };
 
   return (
     <Flex
@@ -74,10 +74,7 @@ export default function BottomNav({ type = "tenant" }) {
             cursor="pointer"
             onClick={() => navigate(item.path)}
           >
-            <Icon
-              size={18}
-              color={active ? "#3182ce" : "#718096"}
-            />
+            <Icon size={18} color={active ? "#3182ce" : "#718096"} />
 
             <Text
               fontSize="xs"
