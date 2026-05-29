@@ -32,7 +32,7 @@ import InvoicePage from "../features/invoice/InvoicePage";
 import InvoiceCreatePage from "../features/invoice/InvoiceCreatePage";
 import InvoiceDetailsPage from "../features/invoice/InvoiceDetailsPage";
 import TenantUserPage from "../features/user/TenantUserPage";
-import PartiesPage from "../pages/PartiesPage";
+import TenantUserAccessPage from "../features/user-access/TenantUserAccessPage";
 
 /* =========================================================
  * Admin Pages
@@ -57,7 +57,6 @@ import BillingPage from "../features/admin/BillingPage";
  * =======================================================*/
 const TenantCompaniesPage = TenantCompanyPage;
 const TenantUsersPage = TenantUserPage;
-const TenantUserAccessPage = PartiesPage;
 const TenantCustomersPage = CustomerPage;
 const TenantInvoiceSequencePage = InvoiceSequencePage;
 const TenantInvoicePage = InvoicePage;

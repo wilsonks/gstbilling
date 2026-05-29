@@ -30,4 +30,21 @@ public interface UserAccessRepository extends JpaRepository<UserAccess, Long> {
             Long tenantId,
             Pageable pageable
     );
+
+
+    //Tenant specific queries
+
+    Optional<UserAccess> findByIdAndTenantId(Long id, Long tenantId);
+
+    List<UserAccess> findByTenantId(Long tenantId);
+
+    Page<UserAccess> findByTenantId(Long tenantId, Pageable pageable);
+
+    long countByTenantId(Long tenantId);
+
+    long countByTenantIdAndActiveTrue(Long tenantId);
+
+    List<UserAccess> findTop5ByTenantIdOrderByUpdatedAtDesc(Long tenantId);
+
+    List<UserAccess> findByTenantIdAndActiveTrue(Long tenantId);
 }
