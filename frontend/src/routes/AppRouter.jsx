@@ -31,6 +31,7 @@ import InvoiceSequencePage from "../features/invoice-sequence/InvoiceSequencePag
 import InvoicePage from "../features/invoice/InvoicePage";
 import InvoiceCreatePage from "../features/invoice/InvoiceCreatePage";
 import InvoiceDetailsPage from "../features/invoice/InvoiceDetailsPage";
+import TenantUserPage from "../features/user/TenantUserPage";
 import PartiesPage from "../pages/PartiesPage";
 
 /* =========================================================
@@ -55,7 +56,7 @@ import BillingPage from "../features/admin/BillingPage";
  * Replace these with dedicated tenant pages as you build them.
  * =======================================================*/
 const TenantCompaniesPage = TenantCompanyPage;
-const TenantUsersPage = PartiesPage;
+const TenantUsersPage = TenantUserPage;
 const TenantUserAccessPage = PartiesPage;
 const TenantCustomersPage = CustomerPage;
 const TenantInvoiceSequencePage = InvoiceSequencePage;

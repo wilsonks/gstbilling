@@ -4,6 +4,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface UserRepository extends JpaRepository<User, Long> {
@@ -22,6 +23,29 @@ public interface UserRepository extends JpaRepository<User, Long> {
             String email,
             Pageable pageable
     );
+
+
+    Optional<User> findByIdAndTenantId(Long id, Long tenantId);
+
+    List<User> findByTenantIdAndScope(Long tenantId, UserScope scope);
+
+    Page<User> findByTenantIdAndScope(Long tenantId, UserScope scope, Pageable pageable);
+
+    Page<User> findByTenantIdAndScopeAndUsernameContainingIgnoreCaseOrTenantIdAndScopeAndEmailContainingIgnoreCase(
+            Long tenantId1,
+            UserScope scope1,
+            String username,
+            Long tenantId2,
+            UserScope scope2,
+            String email,
+            Pageable pageable
+    );
+
+    long countByTenantIdAndScope(Long tenantId, UserScope scope);
+
+    long countByTenantIdAndScopeAndActiveTrue(Long tenantId, UserScope scope);
+
+    List<User> findTop5ByTenantIdAndScopeOrderByUpdatedAtDesc(Long tenantId, UserScope scope);
 
 
 }

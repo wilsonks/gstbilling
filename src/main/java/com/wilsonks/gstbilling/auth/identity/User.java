@@ -43,4 +43,7 @@ public class User extends BaseEntity {
     @CollectionTable(name = "app_user_roles", joinColumns = @JoinColumn(name = "user_id"))
     @Column(name = "role")
     private List<String> roles;
+
+    @Column(nullable = false)
+    private boolean active;
 }

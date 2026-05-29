@@ -214,6 +214,7 @@ public class DemoSeeder implements ApplicationRunner {
         user.setScope(UserScope.TENANT);
         user.setTenantId(tenantId);
         user.setRoles(roles);
+        user.setActive(true);
 
         return userRepo.save(user);
     }
