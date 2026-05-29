@@ -38,7 +38,6 @@ public class SecurityFilterChainConfig {
                                 "/login",
                                 "/dashboard",
                                 "/register",
-                                "/admin/**",
                                 "/index.html",
                                 "/static/**",
                                 "/assets/**",
@@ -60,19 +59,15 @@ public class SecurityFilterChainConfig {
                         .requestMatchers("/api/auth/logout").authenticated()
                         .requestMatchers("/api/auth/switch-company").authenticated()
 
-                        // ---- Platform Tenants (RBAC) ----
+                        // ---- Platform (RBAC) ----
                         .requestMatchers("/api/platform/**").hasAnyRole("SUPER_ADMIN")
 
-                        // ---- Masters (RBAC) ----
-                        .requestMatchers(HttpMethod.GET, "/api/masters/**").hasAnyRole("USER", "ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/masters/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/api/masters/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.PATCH, "/api/masters/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/api/masters/**").hasRole("ADMIN")
-
-                        // RBAC examples
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.GET, "/api/**").hasAnyRole("USER", "ADMIN")
+                        // ---- Tenant (RBAC) ----
+                        .requestMatchers(HttpMethod.GET, "/api/**").hasAnyRole("STAFF", "MANAGER", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/**").hasAnyRole("STAFF", "MANAGER", "ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/**").hasAnyRole("STAFF", "MANAGER", "ADMIN")
+                        .requestMatchers(HttpMethod.PATCH, "/api/**").hasAnyRole("STAFF", "MANAGER", "ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/**").hasAnyRole("MANAGER", "ADMIN")
 
                         // everything else requires authentication
                         .anyRequest().authenticated()

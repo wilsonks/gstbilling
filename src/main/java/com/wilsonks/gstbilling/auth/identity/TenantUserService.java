@@ -3,6 +3,7 @@ package com.wilsonks.gstbilling.auth.identity;
 import com.wilsonks.gstbilling.context.TenantContext;
 import com.wilsonks.gstbilling.exception.NotFoundException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -14,6 +15,7 @@ import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class TenantUserService {
 
     private final UserRepository userRepository;
@@ -34,7 +36,7 @@ public class TenantUserService {
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setScope(UserScope.TENANT);
         user.setTenantId(tenantId);
-        user.setRoles(normalizeRoles(request.getRoles()));
+        user.setRoles(request.getRoles());
         user.setActive(request.getActive() == null || request.getActive());
 
         try {
@@ -55,9 +57,8 @@ public class TenantUserService {
         if (user.getScope() != UserScope.TENANT) {
             throw new IllegalArgumentException("Only tenant users can be modified here");
         }
-
         user.setEmail(request.getEmail());
-        user.setRoles(normalizeRoles(request.getRoles()));
+        user.setRoles(request.getRoles());
         if (request.getActive() != null) {
             user.setActive(request.getActive());
         }
@@ -200,12 +201,15 @@ public class TenantUserService {
 
     private void validateUpdate(TenantUserUpdateRequest request) {
         if (request == null) {
+            log.warn("Update request is null");
             throw new IllegalArgumentException("User payload is required");
         }
         if (request.getEmail() == null || request.getEmail().isBlank()) {
+            log.warn("Email is missing in update request");
             throw new IllegalArgumentException("Email is required");
         }
         if (request.getRoles() == null || request.getRoles().isEmpty()) {
+            log.warn("Roles are missing in update request");
             throw new IllegalArgumentException("At least one role is required");
         }
     }
