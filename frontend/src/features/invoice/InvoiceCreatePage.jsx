@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Button,
@@ -27,7 +27,8 @@ import { useNavigate } from "react-router-dom";
 import { createInvoice } from "./invoiceApi";
 import { getMyCustomers } from "../customer/customerApi";
 import { getMyProducts } from "../product/productApi";
-import AsyncEntitySelect from "../../components/async/AsyncEntitySelect";
+import CustomerSelect from "../../components/async/CustomerSelect";
+import ProductSelect from "../../components/async/ProductSelect";
 
 function formatCurrency(value) {
   const amount = Number(value || 0);
@@ -67,14 +68,6 @@ export default function InvoiceCreatePage() {
     termsAndConditions: "Payment due within agreed credit period.",
     lines: [{ ...initialLine }],
   });
-
-  const loadCustomers = useCallback(async () => {
-    return await getMyCustomers();
-  }, []);
-
-  const loadProducts = useCallback(async () => {
-    return await getMyProducts();
-  }, []);
 
   useEffect(() => {
     const loadData = async () => {
@@ -351,15 +344,9 @@ export default function InvoiceCreatePage() {
                 <Text fontSize="sm" color="gray.600" mb={2}>
                   Customer
                 </Text>
-                <AsyncEntitySelect
+                <CustomerSelect
                   value={form.customerId}
                   onChange={(value) => handleHeaderChange("customerId", value)}
-                  loadOptions={loadCustomers}
-                  placeholder="Select customer"
-                  getOptionValue={(item) => String(item.id)}
-                  getOptionLabel={(item) =>
-                    `${item.code || item.id} - ${item.legalName || item.name || "Customer"}`
-                  }
                   isDisabled={loading || saving}
                 />
               </Box>
@@ -453,15 +440,9 @@ export default function InvoiceCreatePage() {
                   {computedLines.map((line, index) => (
                     <Tr key={index}>
                       <Td>
-                        <AsyncEntitySelect
+                        <ProductSelect
                           value={line.productId}
                           onChange={(value) => handleLineChange(index, "productId", value)}
-                          loadOptions={loadProducts}
-                          placeholder="Select product"
-                          getOptionValue={(item) => String(item.id)}
-                          getOptionLabel={(item) =>
-                            `${item.code || item.id} - ${item.name || "Product"}`
-                          }
                           isDisabled={loading || saving}
                         />
                       </Td>

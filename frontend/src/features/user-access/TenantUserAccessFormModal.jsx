@@ -22,6 +22,8 @@ import {
   createTenantUserAccess,
   updateTenantUserAccess,
 } from "./tenantUserAccessApi";
+import UserSelect from "../../components/async/UserSelect";
+import CompanySelect from "../../components/async/CompanySelect";
 
 const ROLE_OPTIONS = ["ADMIN", "MANAGER", "STAFF"];
 
@@ -30,8 +32,6 @@ export default function TenantUserAccessFormModal({
   onClose,
   onSuccess,
   accessRecord = null,
-  users = [],
-  companies = [],
 }) {
   const toast = useToast();
 
@@ -61,8 +61,8 @@ export default function TenantUserAccessFormModal({
       });
     } else {
       setForm({
-        userId: users[0]?.id ?? "",
-        companyId: companies[0]?.id ?? "",
+        userId: "",
+        companyId: "",
         role: "STAFF",
         active: true,
       });
@@ -70,7 +70,7 @@ export default function TenantUserAccessFormModal({
 
     setTouched({});
     setLoadingForm(false);
-  }, [isOpen, accessRecord, users, companies]);
+  }, [isOpen, accessRecord]);
 
   const errors = useMemo(() => {
     const next = {};
@@ -182,19 +182,11 @@ export default function TenantUserAccessFormModal({
               <>
                 <FormControl isRequired isInvalid={touched.userId && !!errors.userId}>
                   <FormLabel>User</FormLabel>
-                  <Select
+                  <UserSelect
                     value={form.userId}
-                    onChange={(e) => handleChange("userId", e.target.value)}
-                    onBlur={() => handleBlur("userId")}
+                    onChange={(value) => handleChange("userId", value)}
                     isDisabled={disableForm || editing}
-                    placeholder="Select user"
-                  >
-                    {users.map((user) => (
-                      <option key={user.id} value={user.id}>
-                        {user.username} - {user.email}
-                      </option>
-                    ))}
-                  </Select>
+                  />
                   <FormErrorMessage>{errors.userId}</FormErrorMessage>
                 </FormControl>
 
@@ -203,19 +195,11 @@ export default function TenantUserAccessFormModal({
                   isInvalid={touched.companyId && !!errors.companyId}
                 >
                   <FormLabel>Company</FormLabel>
-                  <Select
+                  <CompanySelect
                     value={form.companyId}
-                    onChange={(e) => handleChange("companyId", e.target.value)}
-                    onBlur={() => handleBlur("companyId")}
+                    onChange={(value) => handleChange("companyId", value)}
                     isDisabled={disableForm || editing}
-                    placeholder="Select company"
-                  >
-                    {companies.map((company) => (
-                      <option key={company.id} value={company.id}>
-                        {company.name} - {company.gstin}
-                      </option>
-                    ))}
-                  </Select>
+                  />
                   <FormErrorMessage>{errors.companyId}</FormErrorMessage>
                 </FormControl>
 
