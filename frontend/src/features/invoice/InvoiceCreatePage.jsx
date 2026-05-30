@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import {
   Box,
   Button,
@@ -11,7 +11,6 @@ import {
   HStack,
   IconButton,
   Input,
-  Select,
   Stack,
   Table,
   Tbody,
@@ -28,6 +27,7 @@ import { useNavigate } from "react-router-dom";
 import { createInvoice } from "./invoiceApi";
 import { getMyCustomers } from "../customer/customerApi";
 import { getMyProducts } from "../product/productApi";
+import AsyncEntitySelect from "../../components/async/AsyncEntitySelect";
 
 function formatCurrency(value) {
   const amount = Number(value || 0);
@@ -68,6 +68,14 @@ export default function InvoiceCreatePage() {
     lines: [{ ...initialLine }],
   });
 
+  const loadCustomers = useCallback(async () => {
+    return await getMyCustomers();
+  }, []);
+
+  const loadProducts = useCallback(async () => {
+    return await getMyProducts();
+  }, []);
+
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
@@ -83,7 +91,7 @@ export default function InvoiceCreatePage() {
         if ((customerData || []).length > 0) {
           setForm((prev) => ({
             ...prev,
-            customerId: prev.customerId || customerData[0].id,
+            customerId: prev.customerId || String(customerData[0].id),
           }));
         }
       } catch (error) {
@@ -100,14 +108,16 @@ export default function InvoiceCreatePage() {
     };
 
     loadData();
-  }, []);
+  }, [toast]);
 
   const productsById = useMemo(() => {
     return new Map(products.map((product) => [String(product.id), product]));
   }, [products]);
 
   const selectedCustomer = useMemo(() => {
-    return customers.find((customer) => String(customer.id) === String(form.customerId)) || null;
+    return (
+      customers.find((customer) => String(customer.id) === String(form.customerId)) || null
+    );
   }, [customers, form.customerId]);
 
   const computedLines = useMemo(() => {
@@ -116,22 +126,31 @@ export default function InvoiceCreatePage() {
       const quantity = toNumber(line.quantity, 0);
       const unitPrice = toNumber(line.unitPrice, 0);
       const taxable = quantity * unitPrice;
+      const gstRate = Number(product?.gstRate ?? 0);
+      const taxAmount = (taxable * gstRate) / 100;
+      const lineTotal = taxable + taxAmount;
 
       return {
         ...line,
         product,
         quantity,
         unitPrice,
+        gstRate,
         taxable,
+        taxAmount,
+        lineTotal,
       };
     });
   }, [form.lines, productsById]);
 
   const summary = useMemo(() => {
     const taxableTotal = computedLines.reduce((sum, line) => sum + line.taxable, 0);
+    const taxTotal = computedLines.reduce((sum, line) => sum + line.taxAmount, 0);
+
     return {
       taxableTotal,
-      grandTotal: taxableTotal,
+      taxTotal,
+      grandTotal: taxableTotal + taxTotal,
     };
   }, [computedLines]);
 
@@ -149,11 +168,19 @@ export default function InvoiceCreatePage() {
 
       if (field === "productId") {
         const product = productsById.get(String(value));
-        nextLine.unitPrice = product?.defaultPrice ?? 0;
-        nextLine.description = product?.description ?? "";
+        nextLine.unitPrice =
+          product?.defaultPrice ??
+          product?.price ??
+          product?.sellingPrice ??
+          0;
+        nextLine.description =
+          product?.description ??
+          product?.name ??
+          "";
       }
 
       nextLines[index] = nextLine;
+
       return {
         ...prev,
         lines: nextLines,
@@ -171,9 +198,10 @@ export default function InvoiceCreatePage() {
   const removeLine = (index) => {
     setForm((prev) => ({
       ...prev,
-      lines: prev.lines.length === 1
-        ? prev.lines
-        : prev.lines.filter((_, i) => i !== index),
+      lines:
+        prev.lines.length === 1
+          ? prev.lines
+          : prev.lines.filter((_, i) => i !== index),
     }));
   };
 
@@ -210,6 +238,7 @@ export default function InvoiceCreatePage() {
 
     for (let i = 0; i < form.lines.length; i += 1) {
       const line = form.lines[i];
+
       if (!line.productId) {
         toast({
           title: `Product is required on line ${i + 1}`,
@@ -303,7 +332,7 @@ export default function InvoiceCreatePage() {
 
           <Heading size="lg">Create Invoice</Heading>
           <Text color="gray.500" mt={1}>
-            Create a customer invoice with product lines and pricing.
+            Create a customer invoice with product lines, pricing, and GST preview.
           </Text>
         </Box>
 
@@ -322,18 +351,17 @@ export default function InvoiceCreatePage() {
                 <Text fontSize="sm" color="gray.600" mb={2}>
                   Customer
                 </Text>
-                <Select
+                <AsyncEntitySelect
                   value={form.customerId}
-                  onChange={(e) => handleHeaderChange("customerId", e.target.value)}
+                  onChange={(value) => handleHeaderChange("customerId", value)}
+                  loadOptions={loadCustomers}
+                  placeholder="Select customer"
+                  getOptionValue={(item) => String(item.id)}
+                  getOptionLabel={(item) =>
+                    `${item.code || item.id} - ${item.legalName || item.name || "Customer"}`
+                  }
                   isDisabled={loading || saving}
-                >
-                  <option value="">Select customer</option>
-                  {customers.map((customer) => (
-                    <option key={customer.id} value={customer.id}>
-                      {customer.code} - {customer.legalName}
-                    </option>
-                  ))}
-                </Select>
+                />
               </Box>
 
               <Box>
@@ -351,13 +379,13 @@ export default function InvoiceCreatePage() {
 
             {selectedCustomer && (
               <Box borderWidth="1px" borderColor="blue.100" bg="blue.50" borderRadius="md" p={4}>
-                <Text fontWeight="600">{selectedCustomer.legalName}</Text>
+                <Text fontWeight="600">{selectedCustomer.legalName || selectedCustomer.name}</Text>
                 <Text fontSize="sm" color="gray.600">
                   {selectedCustomer.gstin || "No GSTIN"} • Payment Terms:{" "}
                   {selectedCustomer.paymentTermsDays ?? 0} days
                 </Text>
                 <Text fontSize="sm" color="gray.600">
-                  {selectedCustomer.billingAddressLine1 || "—"}
+                  {selectedCustomer.billingAddressLine1 || selectedCustomer.addressLine1 || "—"}
                 </Text>
               </Box>
             )}
@@ -382,9 +410,7 @@ export default function InvoiceCreatePage() {
                 </Text>
                 <Textarea
                   value={form.termsAndConditions}
-                  onChange={(e) =>
-                    handleHeaderChange("termsAndConditions", e.target.value)
-                  }
+                  onChange={(e) => handleHeaderChange("termsAndConditions", e.target.value)}
                   rows={3}
                   placeholder="Terms and conditions"
                   isDisabled={loading || saving}
@@ -409,34 +435,35 @@ export default function InvoiceCreatePage() {
               <Table variant="simple" size="md">
                 <Thead>
                   <Tr>
-                    <Th width="25%">Product</Th>
-                    <Th width="25%">Description</Th>
+                    <Th width="20%">Product</Th>
+                    <Th width="20%">Description</Th>
                     <Th isNumeric>Qty</Th>
                     <Th isNumeric>Unit Price</Th>
                     <Th>HSN/SAC</Th>
                     <Th>Unit</Th>
+                    <Th isNumeric>GST %</Th>
                     <Th isNumeric>Taxable</Th>
+                    <Th isNumeric>Tax</Th>
+                    <Th isNumeric>Total</Th>
                     <Th width="60px"></Th>
                   </Tr>
                 </Thead>
+
                 <Tbody>
                   {computedLines.map((line, index) => (
                     <Tr key={index}>
                       <Td>
-                        <Select
+                        <AsyncEntitySelect
                           value={line.productId}
-                          onChange={(e) =>
-                            handleLineChange(index, "productId", e.target.value)
+                          onChange={(value) => handleLineChange(index, "productId", value)}
+                          loadOptions={loadProducts}
+                          placeholder="Select product"
+                          getOptionValue={(item) => String(item.id)}
+                          getOptionLabel={(item) =>
+                            `${item.code || item.id} - ${item.name || "Product"}`
                           }
                           isDisabled={loading || saving}
-                        >
-                          <option value="">Select product</option>
-                          {products.map((product) => (
-                            <option key={product.id} value={product.id}>
-                              {product.code} - {product.name}
-                            </option>
-                          ))}
-                        </Select>
+                        />
                       </Td>
 
                       <Td>
@@ -476,9 +503,12 @@ export default function InvoiceCreatePage() {
                         />
                       </Td>
 
-                      <Td>{line.product?.hsnSacId || "—"}</Td>
-                      <Td>{line.product?.unitId || "—"}</Td>
+                      <Td>{line.product?.hsnSacCode || line.product?.hsnSacId || "—"}</Td>
+                      <Td>{line.product?.unitCode || line.product?.unitId || "—"}</Td>
+                      <Td isNumeric>{Number(line.gstRate || 0).toFixed(2)}%</Td>
                       <Td isNumeric>{formatCurrency(line.taxable)}</Td>
+                      <Td isNumeric>{formatCurrency(line.taxAmount)}</Td>
+                      <Td isNumeric>{formatCurrency(line.lineTotal)}</Td>
 
                       <Td>
                         <IconButton
@@ -511,6 +541,11 @@ export default function InvoiceCreatePage() {
             </Flex>
 
             <Flex justify="space-between">
+              <Text color="gray.600">Estimated Tax Total</Text>
+              <Text fontWeight="600">{formatCurrency(summary.taxTotal)}</Text>
+            </Flex>
+
+            <Flex justify="space-between">
               <Text color="gray.600">Estimated Grand Total</Text>
               <Text fontWeight="700" fontSize="lg" color="blue.600">
                 {formatCurrency(summary.grandTotal)}
@@ -518,7 +553,7 @@ export default function InvoiceCreatePage() {
             </Flex>
 
             <Text fontSize="sm" color="gray.500">
-              Final GST/tax breakup and invoice number will be computed by the backend.
+              Final tax breakup and invoice number will still be computed by the backend.
             </Text>
           </Stack>
         </CardBody>
