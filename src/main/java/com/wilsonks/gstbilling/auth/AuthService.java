@@ -305,15 +305,16 @@ public class AuthService {
         }
     }
 
-    public AuthResponse switchCompany(String username, Long companyId, String ip) throws AuthException {
+    public AuthResponse switchCompany(User user, Long companyId, String ip) throws AuthException {
 
-        User user = repository.findByUsername(username)
-                .orElseThrow(() -> new AuthException("User not found"));
+        if (user == null || user.getId() == null) {
+            throw new AuthException("User not found");
+        }
 
         var accessList = userAccessService.getUserAccesses(user.getId());
 
         if (accessList.isEmpty()) {
-            auditEvent(username, ACTION_SWITCH_COMPANY_FAILED, companyId, ip);
+            auditEvent(user.getUsername(), ACTION_SWITCH_COMPANY_FAILED, companyId, ip);
             throw new AuthException("No company access assigned");
         }
 

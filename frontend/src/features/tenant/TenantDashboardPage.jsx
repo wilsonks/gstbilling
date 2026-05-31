@@ -35,11 +35,13 @@ import {
   Users,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useDispatch } from "react-redux";
 import { getMyCompanies } from "../company/companyApi";
 import { getProductStats } from "../product/productApi";
 import { getCustomerStats } from "../customer/customerApi";
 import { getInvoiceStats, getInvoicesPage } from "../invoice/invoiceApi";
 import { getInvoiceSequences } from "../invoice-sequence/invoiceSequenceApi";
+import { setCompanyList } from "../company/companySlice";
 
 function MetricCard({
   label,
@@ -50,7 +52,12 @@ function MetricCard({
   accent = "blue.500",
 }) {
   return (
-    <Card borderWidth="1px" borderColor="gray.200" shadow="sm" borderRadius="xl">
+    <Card
+      borderWidth="1px"
+      borderColor="gray.200"
+      shadow="sm"
+      borderRadius="xl"
+    >
       <CardBody>
         <HStack justify="space-between" align="flex-start">
           <Stat>
@@ -97,6 +104,7 @@ function formatDate(value) {
 
 export default function TenantDashboardPage() {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const toast = useToast();
 
   const [loading, setLoading] = useState(true);
@@ -146,14 +154,18 @@ export default function TenantDashboardPage() {
         getInvoicesPage({ page: 0, size: 10 }),
       ]);
 
-      setCompanies(companiesData || []);
+      const nextCompanies = companiesData || [];
+
+      setCompanies(nextCompanies);
+      dispatch(setCompanyList({ companies: nextCompanies }));
+
       setProductStats(
         productStatsData || {
           total: 0,
           active: 0,
           inactive: 0,
           recentProducts: [],
-        }
+        },
       );
       setCustomerStats(
         customerStatsData || {
@@ -161,13 +173,13 @@ export default function TenantDashboardPage() {
           active: 0,
           inactive: 0,
           recentCustomers: [],
-        }
+        },
       );
       setInvoiceStats(
         invoiceStatsData || {
           total: 0,
           recentInvoices: [],
-        }
+        },
       );
       setInvoiceSequences(invoiceSequenceData || []);
       setInvoiceRows(invoicePageData?.content || []);
@@ -199,7 +211,7 @@ export default function TenantDashboardPage() {
   const totalInvoiceValue = useMemo(() => {
     return invoiceRows.reduce(
       (sum, invoice) => sum + Number(invoice.totalInvoiceAmount || 0),
-      0
+      0,
     );
   }, [invoiceRows]);
 
@@ -222,7 +234,8 @@ export default function TenantDashboardPage() {
         <Box>
           <Heading size="lg">Tenant Dashboard</Heading>
           <Text color="gray.500" mt={1}>
-            Track companies, products, customers, invoice sequences, and invoices for the active tenant.
+            Track companies, products, customers, invoice sequences, and
+            invoices for the active tenant.
           </Text>
         </Box>
 
@@ -289,7 +302,12 @@ export default function TenantDashboardPage() {
 
       <Grid templateColumns={{ base: "1fr", xl: "2fr 1fr" }} gap={6}>
         <GridItem>
-          <Card borderWidth="1px" borderColor="gray.200" shadow="sm" borderRadius="xl">
+          <Card
+            borderWidth="1px"
+            borderColor="gray.200"
+            shadow="sm"
+            borderRadius="xl"
+          >
             <CardBody>
               <Flex justify="space-between" align="center" mb={4}>
                 <Box>
@@ -299,7 +317,11 @@ export default function TenantDashboardPage() {
                   </Text>
                 </Box>
 
-                <Button size="sm" variant="outline" onClick={() => navigate("/invoices")}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => navigate("/invoices")}
+                >
                   View All
                 </Button>
               </Flex>
@@ -346,15 +368,17 @@ export default function TenantDashboardPage() {
                           </Td>
                           <Td>{formatDate(invoice.invoiceDate)}</Td>
                           <Td>{invoice.customerLegalName || "—"}</Td>
-                          <Td isNumeric>{formatCurrency(invoice.totalInvoiceAmount)}</Td>
+                          <Td isNumeric>
+                            {formatCurrency(invoice.totalInvoiceAmount)}
+                          </Td>
                           <Td>
                             <Badge
                               colorScheme={
                                 invoice.status === "CANCELLED"
                                   ? "red"
                                   : invoice.status === "ISSUED"
-                                  ? "green"
-                                  : "gray"
+                                    ? "green"
+                                    : "gray"
                               }
                             >
                               {invoice.status || "—"}
@@ -372,30 +396,52 @@ export default function TenantDashboardPage() {
 
         <GridItem>
           <Stack spacing={6}>
-            <Card borderWidth="1px" borderColor="gray.200" shadow="sm" borderRadius="xl">
+            <Card
+              borderWidth="1px"
+              borderColor="gray.200"
+              shadow="sm"
+              borderRadius="xl"
+            >
               <CardBody>
                 <Heading size="md" mb={4}>
                   Quick Actions
                 </Heading>
 
                 <Stack spacing={3}>
-                  <Button onClick={() => navigate("/invoices/new")} colorScheme="blue">
+                  <Button
+                    onClick={() => navigate("/invoices/new")}
+                    colorScheme="blue"
+                  >
                     Create Invoice
                   </Button>
-                  <Button variant="outline" onClick={() => navigate("/customers")}>
+                  <Button
+                    variant="outline"
+                    onClick={() => navigate("/customers")}
+                  >
                     Manage Customers
                   </Button>
-                  <Button variant="outline" onClick={() => navigate("/products")}>
+                  <Button
+                    variant="outline"
+                    onClick={() => navigate("/products")}
+                  >
                     Manage Products
                   </Button>
-                  <Button variant="outline" onClick={() => navigate("/invoice-sequences")}>
+                  <Button
+                    variant="outline"
+                    onClick={() => navigate("/invoice-sequences")}
+                  >
                     Manage Invoice Sequences
                   </Button>
                 </Stack>
               </CardBody>
             </Card>
 
-            <Card borderWidth="1px" borderColor="gray.200" shadow="sm" borderRadius="xl">
+            <Card
+              borderWidth="1px"
+              borderColor="gray.200"
+              shadow="sm"
+              borderRadius="xl"
+            >
               <CardBody>
                 <Heading size="md" mb={4}>
                   Snapshot
@@ -424,7 +470,9 @@ export default function TenantDashboardPage() {
 
                   <Flex justify="space-between">
                     <Text color="gray.500">Recent Invoice Value</Text>
-                    <Text fontWeight="700">{formatCurrency(totalInvoiceValue)}</Text>
+                    <Text fontWeight="700">
+                      {formatCurrency(totalInvoiceValue)}
+                    </Text>
                   </Flex>
                 </Stack>
               </CardBody>

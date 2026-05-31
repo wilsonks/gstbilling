@@ -10,11 +10,15 @@ const companySlice = createSlice({
   initialState,
   reducers: {
     setCompanyList: (state, action) => {
-      state.companies = action.payload.companies || [];
+      if (Array.isArray(action.payload)) {
+        state.companies = action.payload;
+      } else {
+        state.companies = action.payload?.companies || [];
+      }
     },
 
     setSelected: (state, action) => {
-      state.selected = action.payload.companyId ?? null;
+      state.selected = action.payload?.companyId ?? action.payload ?? null;
     },
 
     clearCompanies: (state) => {

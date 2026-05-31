@@ -26,6 +26,14 @@ const authSlice = createSlice({
   name: "auth",
   initialState,
   reducers: {
+    setCredentials: (state, action) => {
+      state.accessToken = action.payload.accessToken ?? state.accessToken;
+      state.refreshToken = action.payload.refreshToken ?? state.refreshToken;
+      state.user = action.payload.user ?? state.user;
+      state.scope = action.payload.scope ?? state.scope;
+      state.role = action.payload.role ?? state.role;
+      state.companyId = action.payload.companyId ?? state.companyId;
+    },
     setAuth: (state, action) => {
       state.accessToken = action.payload.accessToken ?? null;
       state.refreshToken = action.payload.refreshToken ?? null;
@@ -64,6 +72,7 @@ const authSlice = createSlice({
 });
 
 export const {
+  setCredentials,
   setAuth,
   updateAccessToken,
   setCompanyContext,

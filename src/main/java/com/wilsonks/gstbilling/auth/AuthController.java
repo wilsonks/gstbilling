@@ -1,5 +1,6 @@
 package com.wilsonks.gstbilling.auth;
 
+import com.wilsonks.gstbilling.auth.identity.User;
 import jakarta.security.auth.message.AuthException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -7,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
@@ -53,20 +55,26 @@ public class AuthController {
         return authService.logout(authorization, token, response, request.getRemoteAddr());
     }
 
-    // =========================
-    // 🔄 SWITCH COMPANY
-    // =========================
     @PostMapping("/switch-company")
     public AuthResponse switchCompany(@RequestBody SwitchCompanyRequest req,
                                       HttpServletRequest request,
-                                      Principal principal) throws AuthException {
-        if (principal == null) {
+                                      Authentication authentication) throws AuthException {
+
+        if (authentication == null || authentication.getPrincipal() == null) {
             throw new AuthException("Unauthorized");
-        } else if (req.getCompanyId() == null) {
+        }
+
+        if (req.getCompanyId() == null) {
             throw new AuthException("Company ID is required");
         }
 
-        return authService.switchCompany(principal.getName(), req.getCompanyId(), request.getRemoteAddr());
+        Object principal = authentication.getPrincipal();
 
+        if (!(principal instanceof User user)) {
+            throw new AuthException("Authenticated user not found");
+        }
+
+        log.info("User {} is switching to company {}", user.getUsername(), req.getCompanyId());
+        return authService.switchCompany(user, req.getCompanyId(), request.getRemoteAddr());
     }
 }

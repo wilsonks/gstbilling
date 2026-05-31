@@ -101,7 +101,7 @@ export default function LoginPage() {
   };
 
   const demoTenantLogin = () => {
-    setEmail("tenantadmin1@local.com");
+    setEmail("tenant1_admin@local.com");
     setPassword("admin@1234");
   };
 

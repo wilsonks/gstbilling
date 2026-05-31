@@ -1,3 +1,0 @@
-2026-05-18 20:15:36.352294+05:30 jdbc[13]: exception
-org.h2.jdbc.JdbcSQLSyntaxErrorException: Syntax error in SQL statement "[*]SREFRESH_TOKEN ELECT * FROM AUTH_AUDIT"; expected "SAVEPOINT, SCRIPT, SHUTDOWN"; SQL statement:
-SREFRESH_TOKEN ELECT * FROM AUTH_AUDIT [42001-232]

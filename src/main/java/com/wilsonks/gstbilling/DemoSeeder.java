@@ -61,6 +61,12 @@ import java.util.List;
 @RequiredArgsConstructor
 public class DemoSeeder implements ApplicationRunner {
 
+    private static final int TENANT_COUNT = 5;
+    private static final int TOTAL_COMPANIES = 20;
+    private static final int PRODUCTS_PER_TENANT = 10;
+    private static final int CUSTOMERS_PER_TENANT = 10;
+    private static final int INVOICES_PER_COMPANY = 5;
+
     private final UserRepository userRepo;
     private final CompanyRepository companyRepo;
     private final UserAccessRepository accessRepo;
@@ -92,40 +98,59 @@ public class DemoSeeder implements ApplicationRunner {
         );
 
         String financialYear = FinancialYearUtil.currentFinancialYear();
+        int companiesPerTenant = TOTAL_COMPANIES / TENANT_COUNT;
 
-        for (int i = 1; i <= 20; i++) {
-            String tenantName = "Demo Tenant " + i;
-            String gstin = generateGstin(i);
-            String companyEmail = "demo" + i + "@company.com";
+        for (int tenantIndex = 1; tenantIndex <= TENANT_COUNT; tenantIndex++) {
+            String tenantName = "Demo Tenant " + tenantIndex;
+            String tenantGstin = generateTenantAnchorGstin(tenantIndex);
+            String tenantEmail = "tenant" + tenantIndex + "@demo.com";
 
-            Tenant tenant = upsertTenant(tenantName, gstin, companyEmail);
+            Tenant tenant = upsertTenant(tenantName, tenantGstin, tenantEmail);
 
-            User tenantAdmin = upsertTenantUser(
-                    "tenantadmin" + i,
-                    "tenantadmin" + i + "@local.com",
-                    "admin@1234",
-                    tenant.getTenantId(),
-                    List.of("ADMIN")
-            );
+            TenantSubscription subscription = upsertSubscription(tenant, tenantIndex);
+            SubscriptionInvoice subscriptionInvoice = upsertLatestInvoice(subscription, tenant, tenantIndex);
+            upsertPaymentForInvoice(subscriptionInvoice, tenant, tenantIndex);
 
-            Company demoCompany = upsertDemoCompany(
-                    "Demo Company " + i,
-                    gstin,
-                    companyEmail,
-                    tenant.getTenantId()
-            );
+            seedProductsForTenant(tenant, tenantIndex);
+            List<Customer> customers = seedCustomersForTenant(tenant, tenantIndex);
 
-            upsertAccess(tenantAdmin.getId(), demoCompany.getId(), tenant.getTenantId(), Role.ADMIN);
+            User tenantAdmin = upsertTenantRoleUser(tenant, "admin", Role.ADMIN);
+            User tenantManager = upsertTenantRoleUser(tenant, "manager", Role.MANAGER);
+            User tenantStaff = upsertTenantRoleUser(tenant, "staff", Role.STAFF);
 
-            TenantSubscription subscription = upsertSubscription(tenant, i);
-            SubscriptionInvoice subscriptionInvoice = upsertLatestInvoice(subscription, tenant, i);
-            upsertPaymentForInvoice(subscriptionInvoice, tenant, i);
+            List<Company> tenantCompanies = new ArrayList<>();
 
-            seedProductsForTenant(tenant, i);
+            for (int companyOffset = 1; companyOffset <= companiesPerTenant; companyOffset++) {
+                int globalCompanyIndex = ((tenantIndex - 1) * companiesPerTenant) + companyOffset;
 
-            Customer customer = upsertDemoCustomer(tenant.getTenantId(), i);
-            upsertInvoiceSequence(tenant.getTenantId(), demoCompany.getId(), financialYear);
-            seedSampleInvoice(tenant.getTenantId(), demoCompany, customer, i, financialYear);
+                Company company = upsertDemoCompany(
+                        tenant,
+                        globalCompanyIndex,
+                        companyOffset
+                );
+
+                tenantCompanies.add(company);
+                upsertInvoiceSequence(tenant.getTenantId(), company.getId(), financialYear);
+            }
+
+            for (Company company : tenantCompanies) {
+                upsertAccess(tenantAdmin.getId(), company.getId(), tenant.getTenantId(), Role.ADMIN);
+                upsertAccess(tenantManager.getId(), company.getId(), tenant.getTenantId(), Role.MANAGER);
+                upsertAccess(tenantStaff.getId(), company.getId(), tenant.getTenantId(), Role.STAFF);
+            }
+
+            for (int companyOffset = 1; companyOffset <= tenantCompanies.size(); companyOffset++) {
+                Company company = tenantCompanies.get(companyOffset - 1);
+                int globalCompanyIndex = ((tenantIndex - 1) * companiesPerTenant) + companyOffset;
+
+                seedInvoicesForCompany(
+                        tenant,
+                        company,
+                        customers,
+                        globalCompanyIndex,
+                        financialYear
+                );
+            }
         }
     }
 
@@ -155,13 +180,6 @@ public class DemoSeeder implements ApplicationRunner {
         upsertHsnSac("210690", "Packaged food and pantry supplies", HsnSacType.HSN, gst5);
     }
 
-    private String generateGstin(int i) {
-        String stateCode = String.format("%02d", 10 + (i % 25));
-        String pan = String.format("ABCDE%04dF", i);
-        String entity = String.valueOf((i % 9) + 1);
-        return stateCode + pan + entity + "Z5";
-    }
-
     private void upsertPlatformUser(
             String username,
             String email,
@@ -180,6 +198,7 @@ public class DemoSeeder implements ApplicationRunner {
         user.setScope(UserScope.PLATFORM);
         user.setTenantId(null);
         user.setRoles(roles);
+        user.setActive(true);
 
         userRepo.save(user);
     }
@@ -195,50 +214,46 @@ public class DemoSeeder implements ApplicationRunner {
         return tenantRepo.save(tenant);
     }
 
-    private User upsertTenantUser(
-            String username,
-            String email,
-            String rawPassword,
-            Long tenantId,
-            List<String> roles
-    ) {
+    private User upsertTenantRoleUser(Tenant tenant, String suffix, Role role) {
+        String username = "tenant" + tenant.getTenantId() + "_" + suffix;
+        String email = username + "@local.com";
+
         User user = userRepo.findByUsername(username).orElseGet(User::new);
 
         user.setUsername(username);
         user.setEmail(email);
 
         if (user.getId() == null) {
-            user.setPassword(encoder.encode(rawPassword));
+            user.setPassword(encoder.encode("admin@1234"));
         }
 
         user.setScope(UserScope.TENANT);
-        user.setTenantId(tenantId);
-        user.setRoles(roles);
+        user.setTenantId(tenant.getTenantId());
+        user.setRoles(List.of(role.name()));
         user.setActive(true);
 
         return userRepo.save(user);
     }
 
-    private Company upsertDemoCompany(
-            String name,
-            String gstin,
-            String email,
-            Long tenantId
-    ) {
+    private Company upsertDemoCompany(Tenant tenant, int globalCompanyIndex, int companyOffsetForTenant) {
+        String gstin = generateCompanyGstin(globalCompanyIndex);
+        String name = resolveCompanyName(globalCompanyIndex);
+        String email = "company" + globalCompanyIndex + "@demo.com";
+
         Company company = companyRepo.findByGstin(gstin).orElseGet(Company::new);
 
+        company.setTenantId(tenant.getTenantId());
         company.setName(name);
-        company.setLegalName(name + " Pvt Ltd");
+        company.setLegalName(name + " Private Limited");
         company.setTradeName(name);
         company.setGstin(gstin);
         company.setEmail(email);
-        company.setTenantId(tenantId);
         company.setActive(true);
-        company.setType(resolveCompanyType(tenantId));
-        company.setPhone("987654" + String.format("%04d", tenantId % 10000));
-        company.setAddressLine1("No. " + tenantId + ", GST Business Park");
-        company.setAddressLine2("Phase 1, Industrial Layout");
-        company.setCity(resolveCity(tenantId));
+        company.setType(resolveCompanyType(globalCompanyIndex));
+        company.setPhone("98" + String.format("%08d", globalCompanyIndex));
+        company.setAddressLine1("Building " + companyOffsetForTenant + ", Business Park");
+        company.setAddressLine2("Sector " + ((globalCompanyIndex % 7) + 1));
+        company.setCity(resolveCity(globalCompanyIndex));
         company.setState(resolveState(gstin));
         company.setCountry("India");
 
@@ -247,36 +262,47 @@ public class DemoSeeder implements ApplicationRunner {
             company.setPan(gstin.substring(2, 12));
         }
 
-        company.setPincode("560" + String.format("%03d", tenantId % 1000));
+        company.setPincode("560" + String.format("%03d", globalCompanyIndex));
 
         return companyRepo.save(company);
     }
 
-    private Customer upsertDemoCustomer(Long tenantId, int index) {
-        String code = "CUST-" + String.format("%03d", index);
-        String gstin = generateCustomerGstin(index);
+    private List<Customer> seedCustomersForTenant(Tenant tenant, int tenantIndex) {
+        List<Customer> customers = new ArrayList<>();
+
+        for (int i = 1; i <= CUSTOMERS_PER_TENANT; i++) {
+            int customerIndex = ((tenantIndex - 1) * CUSTOMERS_PER_TENANT) + i;
+            customers.add(upsertDemoCustomer(tenant.getTenantId(), customerIndex, i));
+        }
+
+        return customers;
+    }
+
+    private Customer upsertDemoCustomer(Long tenantId, int globalCustomerIndex, int localCustomerIndex) {
+        String code = "CUST-" + tenantId + "-" + String.format("%02d", localCustomerIndex);
+        String gstin = generateCustomerGstin(globalCustomerIndex);
 
         Customer customer = customerRepository.findByTenantIdAndCodeIgnoreCase(tenantId, code)
                 .orElseGet(Customer::new);
 
         customer.setTenantId(tenantId);
         customer.setCode(code);
-        customer.setLegalName("Customer " + index + " Private Limited");
-        customer.setTradeName("Customer " + index);
+        customer.setLegalName("Customer " + globalCustomerIndex + " Private Limited");
+        customer.setTradeName("Customer " + globalCustomerIndex);
         customer.setCustomerType(CustomerType.BUSINESS);
         customer.setGstRegistrationType(GstRegistrationType.REGISTERED);
         customer.setGstin(gstin);
         customer.setPan(gstin.substring(2, 12));
-        customer.setContactPerson("Accounts Manager " + index);
-        customer.setPhone("900000" + String.format("%04d", index));
-        customer.setEmail("customer" + index + "@mail.com");
+        customer.setContactPerson("Finance Manager " + globalCustomerIndex);
+        customer.setPhone("90" + String.format("%08d", globalCustomerIndex));
+        customer.setEmail("customer" + globalCustomerIndex + "@mail.com");
 
-        customer.setBillingAddressLine1("Plot " + index + ", Tech Park");
-        customer.setBillingAddressLine2("Commercial Zone");
-        customer.setBillingCity(resolveCustomerCity(index));
+        customer.setBillingAddressLine1("Plot " + globalCustomerIndex + ", Commercial Tech Park");
+        customer.setBillingAddressLine2("Phase " + ((globalCustomerIndex % 4) + 1));
+        customer.setBillingCity(resolveCustomerCity(globalCustomerIndex));
         customer.setBillingState(resolveState(gstin));
         customer.setBillingStateCode(gstin.substring(0, 2));
-        customer.setBillingPincode("600" + String.format("%03d", index % 1000));
+        customer.setBillingPincode("600" + String.format("%03d", globalCustomerIndex % 1000));
         customer.setBillingCountry("India");
 
         customer.setShippingSameAsBilling(true);
@@ -288,7 +314,7 @@ public class DemoSeeder implements ApplicationRunner {
         customer.setShippingPincode(customer.getBillingPincode());
         customer.setShippingCountry(customer.getBillingCountry());
 
-        customer.setPaymentTermsDays((index % 3 == 0) ? 15 : 30);
+        customer.setPaymentTermsDays((globalCustomerIndex % 3 == 0) ? 15 : 30);
         customer.setActive(true);
 
         return customerRepository.save(customer);
@@ -416,80 +442,35 @@ public class DemoSeeder implements ApplicationRunner {
         subscriptionPaymentRepository.save(payment);
     }
 
-    private void seedProductsForTenant(Tenant tenant, int index) {
+    private void seedProductsForTenant(Tenant tenant, int tenantIndex) {
         UnitMaster licenseUnit = getUnitByCode("LICENSE");
         UnitMaster userUnit = getUnitByCode("USER");
         UnitMaster monthUnit = getUnitByCode("MONTH");
         UnitMaster nosUnit = getUnitByCode("NOS");
         UnitMaster boxUnit = getUnitByCode("BOX");
+        UnitMaster pcsUnit = getUnitByCode("PCS");
+        UnitMaster yearUnit = getUnitByCode("YEAR");
 
         HsnSacMaster softwareDev = getHsnSacByCode("998314");
         HsnSacMaster itSupport = getHsnSacByCode("998313");
         HsnSacMaster hosting = getHsnSacByCode("998315");
         HsnSacMaster packagedSoftware = getHsnSacByCode("852349");
         HsnSacMaster officeFurniture = getHsnSacByCode("940360");
+        HsnSacMaster stationery = getHsnSacByCode("441112");
+        HsnSacMaster pantry = getHsnSacByCode("210690");
+        HsnSacMaster education = getHsnSacByCode("490700");
+        HsnSacMaster hardware = getHsnSacByCode("847130");
 
-        upsertProduct(
-                tenant.getTenantId(),
-                "GST-SOFT-" + index,
-                "GST Billing Software " + index,
-                "Core GST billing application license for tenant " + index,
-                new BigDecimal("4999.00"),
-                softwareDev,
-                licenseUnit,
-                softwareDev.getDefaultGstSlab(),
-                true
-        );
-
-        upsertProduct(
-                tenant.getTenantId(),
-                "GST-SUPPORT-" + index,
-                "Support Plan " + index,
-                "Managed application support and helpdesk services",
-                new BigDecimal("1999.00"),
-                itSupport,
-                monthUnit,
-                itSupport.getDefaultGstSlab(),
-                true
-        );
-
-        upsertProduct(
-                tenant.getTenantId(),
-                "GST-USR-" + index,
-                "Additional User Pack " + index,
-                "Per-user add-on pack for billing operations",
-                new BigDecimal("299.00"),
-                hosting,
-                userUnit,
-                hosting.getDefaultGstSlab(),
-                true
-        );
-
-        upsertProduct(
-                tenant.getTenantId(),
-                "GST-KIT-" + index,
-                "Implementation Kit " + index,
-                "One-time implementation starter kit",
-                new BigDecimal("1499.00"),
-                packagedSoftware,
-                nosUnit,
-                packagedSoftware.getDefaultGstSlab(),
-                true
-        );
-
-        if (index % 3 == 0) {
-            upsertProduct(
-                    tenant.getTenantId(),
-                    "GST-FURN-" + index,
-                    "Office Setup Bundle " + index,
-                    "Demo office setup and hardware support bundle",
-                    new BigDecimal("8999.00"),
-                    officeFurniture,
-                    boxUnit,
-                    officeFurniture.getDefaultGstSlab(),
-                    index % 2 == 0
-            );
-        }
+        upsertProduct(tenant.getTenantId(), "SOFT-LIC-" + tenantIndex + "-01", "GST Billing Pro License", "Primary GST billing software license", new BigDecimal("4999.00"), softwareDev, licenseUnit, softwareDev.getDefaultGstSlab(), true);
+        upsertProduct(tenant.getTenantId(), "SUPPORT-" + tenantIndex + "-02", "Support Retainer", "Monthly support and operational assistance", new BigDecimal("1999.00"), itSupport, monthUnit, itSupport.getDefaultGstSlab(), true);
+        upsertProduct(tenant.getTenantId(), "USERPACK-" + tenantIndex + "-03", "Additional User Pack", "Per-user add-on for billing team", new BigDecimal("299.00"), hosting, userUnit, hosting.getDefaultGstSlab(), true);
+        upsertProduct(tenant.getTenantId(), "SETUPKIT-" + tenantIndex + "-04", "Implementation Starter Kit", "One-time onboarding and implementation kit", new BigDecimal("1499.00"), packagedSoftware, nosUnit, packagedSoftware.getDefaultGstSlab(), true);
+        upsertProduct(tenant.getTenantId(), "CHAIRSET-" + tenantIndex + "-05", "Office Furniture Bundle", "Workstation furniture bundle", new BigDecimal("8999.00"), officeFurniture, boxUnit, officeFurniture.getDefaultGstSlab(), tenantIndex % 2 == 0);
+        upsertProduct(tenant.getTenantId(), "STATKIT-" + tenantIndex + "-06", "Stationery Pack", "Paper and stationery consumables", new BigDecimal("799.00"), stationery, pcsUnit, stationery.getDefaultGstSlab(), true);
+        upsertProduct(tenant.getTenantId(), "PANTRY-" + tenantIndex + "-07", "Pantry Supply Bundle", "Packaged pantry essentials", new BigDecimal("599.00"), pantry, boxUnit, pantry.getDefaultGstSlab(), true);
+        upsertProduct(tenant.getTenantId(), "GUIDE-" + tenantIndex + "-08", "Compliance Handbook", "Printed compliance and GST handbook", new BigDecimal("249.00"), education, nosUnit, education.getDefaultGstSlab(), true);
+        upsertProduct(tenant.getTenantId(), "DEVICE-" + tenantIndex + "-09", "Billing Workstation", "Portable workstation for billing operations", new BigDecimal("42999.00"), hardware, nosUnit, hardware.getDefaultGstSlab(), true);
+        upsertProduct(tenant.getTenantId(), "AMC-" + tenantIndex + "-10", "Annual Maintenance Contract", "Yearly maintenance for deployed solution", new BigDecimal("12999.00"), itSupport, yearUnit, itSupport.getDefaultGstSlab(), true);
     }
 
     private void upsertInvoiceSequence(Long tenantId, Long companyId, String financialYear) {
@@ -519,26 +500,51 @@ public class DemoSeeder implements ApplicationRunner {
         invoiceSequenceRepository.save(existing);
     }
 
-    private void seedSampleInvoice(
+    private void seedInvoicesForCompany(
+            Tenant tenant,
+            Company company,
+            List<Customer> customers,
+            int globalCompanyIndex,
+            String financialYear
+    ) {
+        for (int invoiceOffset = 1; invoiceOffset <= INVOICES_PER_COMPANY; invoiceOffset++) {
+            int invoiceSeed = (globalCompanyIndex * 10) + invoiceOffset;
+            Customer customer = customers.get((invoiceOffset - 1) % customers.size());
+
+            seedSingleInvoice(
+                    tenant.getTenantId(),
+                    company,
+                    customer,
+                    globalCompanyIndex,
+                    invoiceOffset,
+                    invoiceSeed,
+                    financialYear
+            );
+        }
+    }
+
+    private void seedSingleInvoice(
             Long tenantId,
             Company company,
             Customer customer,
-            int index,
+            int globalCompanyIndex,
+            int invoiceOffset,
+            int invoiceSeed,
             String financialYear
     ) {
-        String invoiceNo = "INV/" + financialYear + "/" + String.format("%05d", index);
+        String invoiceNo = "INV/" + financialYear + "/" + company.getId() + "-" + String.format("%03d", invoiceOffset);
 
         if (invoiceRepository.findByTenantIdAndCompanyIdAndInvoiceNo(tenantId, company.getId(), invoiceNo).isPresent()) {
             return;
         }
 
         List<Product> products = productRepository.findByTenantId(tenantId);
-        if (products.isEmpty()) {
+        if (products.size() < 2) {
             return;
         }
 
-        Product firstProduct = products.get(0);
-        Product secondProduct = products.size() > 1 ? products.get(1) : products.get(0);
+        Product firstProduct = products.get((invoiceOffset - 1) % products.size());
+        Product secondProduct = products.get(invoiceOffset % products.size());
 
         HsnSacMaster firstHsn = hsnSacMasterRepository.findById(firstProduct.getHsnSacId())
                 .orElseThrow(() -> new IllegalStateException("HSN/SAC missing for product " + firstProduct.getId()));
@@ -560,9 +566,9 @@ public class DemoSeeder implements ApplicationRunner {
         invoice.setTenantId(tenantId);
         invoice.setCompanyId(company.getId());
         invoice.setInvoiceNo(invoiceNo);
-        invoice.setInvoiceDate(LocalDate.now().minusDays(index % 10));
+        invoice.setInvoiceDate(LocalDate.now().minusDays(invoiceSeed % 25));
         invoice.setDueDate(invoice.getInvoiceDate().plusDays(customer.getPaymentTermsDays()));
-        invoice.setStatus(index % 7 == 0 ? InvoiceStatus.CANCELLED : InvoiceStatus.ISSUED);
+        invoice.setStatus(invoiceSeed % 7 == 0 ? InvoiceStatus.CANCELLED : InvoiceStatus.ISSUED);
         invoice.setTaxType(taxType);
         invoice.setPlaceOfSupplyStateCode(customer.getBillingStateCode());
         invoice.setNotes("Demo invoice generated by seed data");
@@ -591,7 +597,7 @@ public class DemoSeeder implements ApplicationRunner {
                 secondHsn,
                 secondUnit,
                 secondSlab,
-                new BigDecimal(index % 2 == 0 ? "2.000" : "1.000"),
+                new BigDecimal((invoiceOffset % 3) + ".000"),
                 secondProduct.getDefaultPrice(),
                 taxType
         ));
@@ -631,7 +637,7 @@ public class DemoSeeder implements ApplicationRunner {
                 )
                 .orElseThrow(() -> new IllegalStateException("Invoice sequence missing"));
 
-        long expectedCurrent = Math.max(sequence.getCurrentNumber(), index);
+        long expectedCurrent = Math.max(sequence.getCurrentNumber(), invoiceOffset);
         sequence.setCurrentNumber(expectedCurrent);
         invoiceSequenceRepository.save(sequence);
     }
@@ -801,9 +807,46 @@ public class DemoSeeder implements ApplicationRunner {
                 .orElseThrow(() -> new IllegalStateException("HSN/SAC not found: " + code));
     }
 
-    private CompanyType resolveCompanyType(Long tenantId) {
-        int mod = (int) (tenantId % 4);
-        return switch (mod) {
+    private String generateTenantAnchorGstin(int index) {
+        String stateCode = String.format("%02d", 27 + (index % 5));
+        String pan = String.format("TENNT%04dF", index);
+        String entity = String.valueOf((index % 9) + 1);
+        return stateCode + pan + entity + "Z5";
+    }
+
+    private String generateCompanyGstin(int index) {
+        String[] stateCodes = {"27", "29", "33", "36", "32"};
+        String stateCode = stateCodes[index % stateCodes.length];
+        String pan = String.format("CMPNY%04dF", index);
+        String entity = String.valueOf((index % 9) + 1);
+        return stateCode + pan + entity + "Z5";
+    }
+
+    private String generateCustomerGstin(int index) {
+        String[] stateCodes = {"27", "29", "33", "36", "32"};
+        String stateCode = stateCodes[index % stateCodes.length];
+        String pan = String.format("CUSTM%04dF", index);
+        String entity = String.valueOf((index % 9) + 1);
+        return stateCode + pan + entity + "Z5";
+    }
+
+    private String resolveCompanyName(int index) {
+        return switch (index % 10) {
+            case 0 -> "Apex Technologies " + index;
+            case 1 -> "Bluewave Solutions " + index;
+            case 2 -> "Crescent Systems " + index;
+            case 3 -> "Delta Tradecorp " + index;
+            case 4 -> "Evergreen Retail " + index;
+            case 5 -> "Fusion Services " + index;
+            case 6 -> "Granite Industries " + index;
+            case 7 -> "Helix Consulting " + index;
+            case 8 -> "Indus Mercantile " + index;
+            default -> "Jupiter Innovations " + index;
+        };
+    }
+
+    private CompanyType resolveCompanyType(int index) {
+        return switch (index % 4) {
             case 0 -> CompanyType.PRIVATE_LIMITED;
             case 1 -> CompanyType.LLP;
             case 2 -> CompanyType.PARTNERSHIP;
@@ -811,8 +854,8 @@ public class DemoSeeder implements ApplicationRunner {
         };
     }
 
-    private String resolveCity(Long tenantId) {
-        return switch ((int) (tenantId % 5)) {
+    private String resolveCity(int index) {
+        return switch (index % 5) {
             case 0 -> "Bengaluru";
             case 1 -> "Hyderabad";
             case 2 -> "Chennai";
@@ -844,14 +887,6 @@ public class DemoSeeder implements ApplicationRunner {
             case "32" -> "Kerala";
             default -> "Andhra Pradesh";
         };
-    }
-
-    private String generateCustomerGstin(int index) {
-        String[] stateCodes = {"27", "29", "33", "36", "32"};
-        String stateCode = stateCodes[index % stateCodes.length];
-        String pan = String.format("CUSTM%04dF", index);
-        String entity = String.valueOf((index % 9) + 1);
-        return stateCode + pan + entity + "Z5";
     }
 
     private TaxType resolveTaxType(String sellerStateCode, String buyerStateCode, String buyerGstin) {
@@ -887,7 +922,7 @@ public class DemoSeeder implements ApplicationRunner {
                     new BigDecimal("5000.00"),
                     new BigDecimal("5000.00"),
                     new BigDecimal("60000.00"),
-                    index % 5 == 0 ? SubscriptionStatus.SUSPENDED : SubscriptionStatus.ACTIVE
+                    SubscriptionStatus.ACTIVE
             );
             case 2 -> new PlanSeed(
                     "BUSINESS",
@@ -896,7 +931,7 @@ public class DemoSeeder implements ApplicationRunner {
                     new BigDecimal("7500.00"),
                     new BigDecimal("7500.00"),
                     new BigDecimal("90000.00"),
-                    index % 6 == 0 ? SubscriptionStatus.PAST_DUE : SubscriptionStatus.ACTIVE
+                    SubscriptionStatus.PAST_DUE
             );
             default -> new PlanSeed(
                     "STARTER",
