@@ -39,3 +39,21 @@ export async function cancelInvoice(id) {
   const response = await api.post(`/api/invoices/${id}/cancel`);
   return response.data;
 }
+
+export async function exportInvoicePdf(id) {
+  const response = await api.get(`/api/invoices/${id}/export/pdf`, {
+    responseType: "blob",
+  });
+  return response;
+}
+
+export async function previewInvoicePdf(id) {
+  const response = await api.get(`/api/invoices/${id}/export/pdf`, {
+    responseType: "blob",
+  });
+  return response;
+}
+
+export function getInvoicePdfUrl(id, disposition = "attachment") {
+  return `/api/invoices/${id}/export/pdf?disposition=${disposition}`;
+}

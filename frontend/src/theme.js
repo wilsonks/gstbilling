@@ -123,6 +123,78 @@ const styles = {
       bg: "gray.50",
       color: "gray.800",
     },
+
+    "@page": {
+      size: "A4",
+      margin: "12mm",
+    },
+
+    "@media print": {
+      html: {
+        background: "#ffffff !important",
+      },
+
+      body: {
+        background: "#ffffff !important",
+        color: "#000000 !important",
+        fontSize: "12px !important",
+        WebkitPrintColorAdjust: "exact",
+        printColorAdjust: "exact",
+      },
+
+      ".no-print": {
+        display: "none !important",
+      },
+
+      ".print-container": {
+        width: "100% !important",
+        maxWidth: "100% !important",
+        margin: "0 !important",
+        padding: "0 !important",
+      },
+
+      ".chakra-card": {
+        boxShadow: "none !important",
+        borderColor: "#E2E8F0 !important",
+        background: "#ffffff !important",
+      },
+
+      ".chakra-button": {
+        display: "none !important",
+      },
+
+      ".chakra-badge": {
+        border: "1px solid #CBD5E0 !important",
+      },
+
+      "nav, aside, header, footer": {
+        display: "none !important",
+      },
+
+      "main": {
+        width: "100% !important",
+        maxWidth: "100% !important",
+        margin: "0 !important",
+        padding: "0 !important",
+      },
+
+      table: {
+        pageBreakInside: "auto",
+      },
+
+      thead: {
+        display: "table-header-group",
+      },
+
+      tr: {
+        pageBreakInside: "avoid",
+        breakInside: "avoid",
+      },
+
+      "h1, h2, h3, h4, h5, h6": {
+        pageBreakAfter: "avoid",
+      },
+    },
   },
 };
 

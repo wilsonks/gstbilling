@@ -22,133 +22,190 @@ import {
   Tr,
   useToast,
 } from "@chakra-ui/react";
-import { ArrowLeft, FileText, RefreshCw, XCircle } from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
-import { cancelInvoice, getInvoiceById } from "./invoiceApi";
-
-function InfoRow({ label, value, children }) {
-  return (
-    <Flex
-      py={3}
-      justify="space-between"
-      align={{ base: "flex-start", md: "center" }}
-      direction={{ base: "column", md: "row" }}
-      gap={2}
-    >
-      <Text color="gray.500" minW="180px">
-        {label}
-      </Text>
-
-      <Box textAlign={{ base: "left", md: "right" }} flex="1">
-        {children || <Text fontWeight="500">{value || "—"}</Text>}
-      </Box>
-    </Flex>
-  );
-}
+import { ArrowLeft, Download, Printer } from "lucide-react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+import {
+  exportInvoicePdf,
+  previewInvoicePdf,
+  getInvoiceById,
+} from "./invoiceApi";
 
 function formatCurrency(value) {
-  const amount = Number(value || 0);
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: "INR",
     maximumFractionDigits: 2,
-  }).format(amount);
+  }).format(Number(value || 0));
+}
+
+function formatNumber(value, digits = 2) {
+  return Number(value || 0).toFixed(digits);
 }
 
 function formatDate(value) {
   if (!value) return "—";
   try {
-    return new Date(value).toLocaleDateString();
+    return new Date(value).toLocaleDateString("en-IN");
   } catch {
     return value;
   }
 }
 
-function formatLabel(value) {
-  return value ? value.replaceAll("_", " ") : "—";
+function taxAmount(line) {
+  return (
+    Number(line.cgstAmount || 0) +
+    Number(line.sgstAmount || 0) +
+    Number(line.igstAmount || 0)
+  );
+}
+
+function PrintSection({ title, children }) {
+  return (
+    <Card
+      variant="outline"
+      sx={{
+        breakInside: "avoid",
+        pageBreakInside: "avoid",
+      }}
+    >
+      <CardBody>
+        <Stack spacing={3}>
+          <Heading size="sm">{title}</Heading>
+          <Divider />
+          {children}
+        </Stack>
+      </CardBody>
+    </Card>
+  );
 }
 
 export default function InvoiceDetailsPage() {
   const { id } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
   const toast = useToast();
 
   const [invoice, setInvoice] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
-  const fetchInvoice = async ({ silent = false } = {}) => {
-    if (!silent) setLoading(true);
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const data = await getInvoiceById(id);
+        setInvoice(data);
+      } catch (error) {
+        toast({
+          title: "Failed to load invoice",
+          description: error?.response?.data?.message || "Please try again.",
+          status: "error",
+          duration: 3000,
+          isClosable: true,
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
 
+    load();
+  }, [id, toast]);
+
+  useEffect(() => {
+    if (!invoice) return;
+
+    const params = new URLSearchParams(location.search);
+    const shouldPrint = params.get("print") === "1";
+
+    if (shouldPrint) {
+      const timer = setTimeout(() => {
+        window.print();
+      }, 400);
+
+      return () => clearTimeout(timer);
+    }
+  }, [invoice, location.search]);
+
+  const lines = useMemo(() => invoice?.lines || [], [invoice]);
+
+  const handleDownloadPdf = async () => {
+    if (!invoice?.id) return;
+
+    setDownloading(true);
     try {
-      const data = await getInvoiceById(id);
-      setInvoice(data);
+      const response = await exportInvoicePdf(invoice.id);
+
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+
+      let fileName = `${invoice.invoiceNo || "invoice"}.pdf`;
+      const disposition = response.headers?.["content-disposition"];
+      const match = disposition?.match(/filename="(.+)"/);
+      if (match?.[1]) {
+        fileName = match[1];
+      }
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
     } catch (error) {
       toast({
-        title: "Failed to load invoice",
+        title: "Failed to export invoice PDF",
         description: error?.response?.data?.message || "Please try again.",
         status: "error",
         duration: 3000,
         isClosable: true,
       });
-      setInvoice(null);
     } finally {
-      if (!silent) setLoading(false);
+      setDownloading(false);
     }
   };
 
-  useEffect(() => {
-    fetchInvoice();
-  }, [id]);
+  // const handlePrint = () => {
+  //   window.print();
+  // };
 
-  const totals = useMemo(() => {
-    if (!invoice) {
-      return {
-        totalQuantity: 0,
-        lineCount: 0,
-      };
-    }
+  const handlePrint = async () => {
+    if (!invoice?.id) return;
 
-    return {
-      totalQuantity: (invoice.lines || []).reduce(
-        (sum, line) => sum + Number(line.quantity || 0),
-        0
-      ),
-      lineCount: (invoice.lines || []).length,
-    };
-  }, [invoice]);
-
-  const handleCancelInvoice = async () => {
-    if (!invoice) return;
-
-    setActionLoading(true);
     try {
-      await cancelInvoice(invoice.id);
+      const response = await previewInvoicePdf(invoice.id);
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
 
-      toast({
-        title: "Invoice cancelled",
-        status: "success",
-        duration: 2500,
-        isClosable: true,
-      });
+      const newWindow = window.open(url, "_blank", "noopener,noreferrer");
 
-      await fetchInvoice({ silent: true });
+      if (!newWindow) {
+        toast({
+          title: "Popup blocked",
+          description: "Please allow popups to preview the invoice PDF.",
+          status: "warning",
+          duration: 3000,
+          isClosable: true,
+        });
+        return;
+      }
+
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+      }, 60000);
     } catch (error) {
       toast({
-        title: "Failed to cancel invoice",
+        title: "Failed to open invoice PDF",
         description: error?.response?.data?.message || "Please try again.",
         status: "error",
         duration: 3000,
         isClosable: true,
       });
-    } finally {
-      setActionLoading(false);
     }
   };
 
   if (loading) {
     return (
-      <Flex justify="center" align="center" py={16}>
+      <Flex justify="center" py={12}>
         <Spinner size="lg" />
       </Flex>
     );
@@ -156,378 +213,405 @@ export default function InvoiceDetailsPage() {
 
   if (!invoice) {
     return (
-      <Card borderWidth="1px" borderColor="gray.200" shadow="sm" borderRadius="xl">
-        <CardBody>
-          <Stack spacing={3}>
-            <Heading size="md">Invoice not found</Heading>
-            <Text color="gray.500">
-              The requested invoice could not be loaded.
-            </Text>
-            <HStack>
-              <Button
-                leftIcon={<ArrowLeft size={16} />}
-                onClick={() => navigate("/invoices")}
-              >
-                Back to Invoices
-              </Button>
-            </HStack>
-          </Stack>
-        </CardBody>
-      </Card>
+      <Stack spacing={4}>
+        <Button
+          size="sm"
+          variant="outline"
+          leftIcon={<ArrowLeft size={14} />}
+          onClick={() => navigate("/invoices")}
+          width="fit-content"
+        >
+          Back
+        </Button>
+        <Text>Invoice not found.</Text>
+      </Stack>
     );
   }
 
   return (
     <Stack spacing={6}>
       <Flex
+        className="no-print"
         justify="space-between"
-        align={{ base: "stretch", lg: "center" }}
-        direction={{ base: "column", lg: "row" }}
+        align={{ base: "stretch", md: "center" }}
+        direction={{ base: "column", md: "row" }}
         gap={4}
       >
         <Box>
-          <HStack spacing={3} mb={2}>
-            <Button
-              size="sm"
-              variant="outline"
-              leftIcon={<ArrowLeft size={14} />}
-              onClick={() => navigate("/invoices")}
-            >
-              Back
-            </Button>
-
-            <Badge
-              colorScheme={
-                invoice.status === "CANCELLED"
-                  ? "red"
-                  : invoice.status === "ISSUED"
-                  ? "green"
-                  : "gray"
-              }
-              px={2}
-              py={1}
-            >
-              {invoice.status || "—"}
-            </Badge>
-          </HStack>
-
-          <Heading size="lg">{invoice.invoiceNo}</Heading>
+          <Button
+            size="sm"
+            variant="outline"
+            leftIcon={<ArrowLeft size={14} />}
+            onClick={() => navigate("/invoices")}
+            mb={3}
+          >
+            Back
+          </Button>
+          <Heading size="lg">{invoice.invoiceNo || "Invoice"}</Heading>
           <Text color="gray.500" mt={1}>
-            Invoice #{invoice.id}
+            View invoice details, print-friendly layout, and PDF export.
           </Text>
         </Box>
 
         <HStack spacing={3} flexWrap="wrap">
           <Button
-            leftIcon={<RefreshCw size={16} />}
             variant="outline"
-            onClick={() => fetchInvoice({ silent: true })}
+            leftIcon={<Printer size={16} />}
+            onClick={handlePrint}
           >
-            Refresh
+            Print Invoice
           </Button>
 
-          {invoice.status !== "CANCELLED" && (
-            <Button
-              leftIcon={<XCircle size={16} />}
-              colorScheme="red"
-              variant="outline"
-              onClick={handleCancelInvoice}
-              isLoading={actionLoading}
-            >
-              Cancel Invoice
-            </Button>
-          )}
+          <Button
+            colorScheme="blue"
+            variant="outline"
+            leftIcon={<Download size={16} />}
+            onClick={handleDownloadPdf}
+            isLoading={downloading}
+          >
+            Download PDF
+          </Button>
         </HStack>
       </Flex>
 
-      <Grid templateColumns={{ base: "1fr", md: "repeat(4, 1fr)" }} gap={4}>
-        <GridItem>
-          <Card borderWidth="1px" borderColor="gray.200" shadow="sm" borderRadius="xl">
-            <CardBody>
-              <Text color="gray.500" fontSize="sm">
-                Grand Total
-              </Text>
-              <Text fontSize="2xl" fontWeight="700" mt={1}>
-                {formatCurrency(invoice.totalInvoiceAmount)}
-              </Text>
-            </CardBody>
-          </Card>
-        </GridItem>
-
-        <GridItem>
-          <Card borderWidth="1px" borderColor="gray.200" shadow="sm" borderRadius="xl">
-            <CardBody>
-              <Text color="gray.500" fontSize="sm">
-                Taxable Amount
-              </Text>
-              <Text fontSize="2xl" fontWeight="700" mt={1}>
-                {formatCurrency(invoice.totalTaxableAmount)}
-              </Text>
-            </CardBody>
-          </Card>
-        </GridItem>
-
-        <GridItem>
-          <Card borderWidth="1px" borderColor="gray.200" shadow="sm" borderRadius="xl">
-            <CardBody>
-              <Text color="gray.500" fontSize="sm">
-                Total Tax
-              </Text>
-              <Text fontSize="2xl" fontWeight="700" mt={1}>
-                {formatCurrency(invoice.totalTaxAmount)}
-              </Text>
-            </CardBody>
-          </Card>
-        </GridItem>
-
-        <GridItem>
-          <Card borderWidth="1px" borderColor="gray.200" shadow="sm" borderRadius="xl">
-            <CardBody>
-              <Text color="gray.500" fontSize="sm">
-                Line Items
-              </Text>
-              <Text fontSize="2xl" fontWeight="700" mt={1}>
-                {totals.lineCount}
-              </Text>
-            </CardBody>
-          </Card>
-        </GridItem>
-      </Grid>
-
-      <Grid templateColumns={{ base: "1fr", xl: "2fr 1fr" }} gap={6}>
-        <GridItem>
-          <Card borderWidth="1px" borderColor="gray.200" shadow="sm" borderRadius="xl">
-            <CardBody>
-              <HStack spacing={3} mb={4}>
-                <FileText size={18} />
-                <Heading size="md">Invoice Information</Heading>
-              </HStack>
-
-              <Divider mb={2} />
-
-              <InfoRow label="Invoice No" value={invoice.invoiceNo} />
-              <Divider />
-
-              <InfoRow label="Invoice Date" value={formatDate(invoice.invoiceDate)} />
-              <Divider />
-
-              <InfoRow label="Due Date" value={formatDate(invoice.dueDate)} />
-              <Divider />
-
-              <InfoRow label="Status" value={invoice.status} />
-              <Divider />
-
-              <InfoRow label="Tax Type" value={formatLabel(invoice.taxType)} />
-              <Divider />
-
-              <InfoRow
-                label="Place of Supply State Code"
-                value={invoice.placeOfSupplyStateCode}
-              />
-              <Divider />
-
-              <InfoRow label="Notes" value={invoice.notes || "—"} />
-              <Divider />
-
-              <InfoRow
-                label="Terms & Conditions"
-                value={invoice.termsAndConditions || "—"}
-              />
-            </CardBody>
-          </Card>
-
+      <Box
+        className="print-container"
+        bg="white"
+        borderRadius="xl"
+        sx={{
+          "@media print": {
+            bg: "white",
+            p: 0,
+          },
+        }}
+      >
+        <Stack spacing={6}>
           <Card
-            mt={6}
             borderWidth="1px"
             borderColor="gray.200"
             shadow="sm"
             borderRadius="xl"
+            sx={{
+              "@media print": {
+                borderWidth: "0",
+                boxShadow: "none",
+                borderRadius: "0",
+              },
+            }}
           >
             <CardBody>
-              <Heading size="md" mb={4}>
-                Line Items
-              </Heading>
+              <Stack spacing={6}>
+                <Flex
+                  justify="space-between"
+                  align="flex-start"
+                  wrap="wrap"
+                  gap={4}
+                  sx={{
+                    breakInside: "avoid",
+                    pageBreakInside: "avoid",
+                  }}
+                >
+                  <Box>
+                    <Text
+                      fontSize="xs"
+                      textTransform="uppercase"
+                      letterSpacing="wide"
+                      color="gray.500"
+                    >
+                      Tax Invoice
+                    </Text>
+                    <Heading size="lg" mt={1}>
+                      {invoice.invoiceNo || "—"}
+                    </Heading>
+                    <Text color="gray.500" mt={1}>
+                      Invoice Date: {formatDate(invoice.invoiceDate)}
+                    </Text>
+                  </Box>
 
-              <Box overflowX="auto">
-                <Table variant="simple" size="md">
-                  <Thead>
-                    <Tr>
-                      <Th>#</Th>
-                      <Th>Product</Th>
-                      <Th>HSN/SAC</Th>
-                      <Th>Unit</Th>
-                      <Th isNumeric>Qty</Th>
-                      <Th isNumeric>Unit Price</Th>
-                      <Th isNumeric>Taxable</Th>
-                      <Th isNumeric>GST %</Th>
-                      <Th isNumeric>Total</Th>
-                    </Tr>
-                  </Thead>
-                  <Tbody>
-                    {(invoice.lines || []).map((line) => (
-                      <Tr key={line.id || `${line.lineNo}-${line.productId}`}>
-                        <Td>{line.lineNo}</Td>
+                  <Badge
+                    colorScheme={
+                      invoice.status === "CANCELLED"
+                        ? "red"
+                        : invoice.status === "ISSUED"
+                          ? "green"
+                          : "gray"
+                    }
+                    fontSize="0.85em"
+                    px={3}
+                    py={1}
+                    borderRadius="md"
+                    width="fit-content"
+                  >
+                    {invoice.status || "—"}
+                  </Badge>
+                </Flex>
 
-                        <Td>
-                          <Stack spacing={0}>
-                            <Text fontWeight="600">{line.productName || "—"}</Text>
-                            <Text fontSize="xs" color="gray.500">
-                              {line.productCode || "—"}
-                            </Text>
-                            {line.description && (
-                              <Text fontSize="xs" color="gray.500">
-                                {line.description}
-                              </Text>
+                <Grid templateColumns={{ base: "1fr", lg: "1fr 1fr" }} gap={6}>
+                  <GridItem>
+                    <PrintSection title="Seller">
+                      <Text fontWeight="700">
+                        {invoice.sellerLegalName || "—"}
+                      </Text>
+                      <Text color="gray.600">
+                        GSTIN: {invoice.sellerGstin || "—"}
+                      </Text>
+                      <Text color="gray.600">
+                        {[
+                          invoice.sellerAddressLine1,
+                          invoice.sellerAddressLine2,
+                          invoice.sellerCity,
+                          invoice.sellerState,
+                          invoice.sellerPincode,
+                          invoice.sellerCountry,
+                        ]
+                          .filter(Boolean)
+                          .join(", ") || "—"}
+                      </Text>
+                      <Text color="gray.600">
+                        State Code: {invoice.sellerStateCode || "—"}
+                      </Text>
+                    </PrintSection>
+                  </GridItem>
+
+                  <GridItem>
+                    <PrintSection title="Customer">
+                      <Text fontWeight="700">
+                        {invoice.customerLegalName || "—"}
+                      </Text>
+                      <Text color="gray.600">
+                        Trade Name: {invoice.customerTradeName || "—"}
+                      </Text>
+                      <Text color="gray.600">
+                        GSTIN: {invoice.customerGstin || "—"}
+                      </Text>
+                      <Text color="gray.600">
+                        {[
+                          invoice.customerBillingAddressLine1,
+                          invoice.customerBillingAddressLine2,
+                          invoice.customerBillingCity,
+                          invoice.customerBillingState,
+                          invoice.customerBillingPincode,
+                          invoice.customerBillingCountry,
+                        ]
+                          .filter(Boolean)
+                          .join(", ") || "—"}
+                      </Text>
+                      <Text color="gray.600">
+                        State Code: {invoice.customerBillingStateCode || "—"}
+                      </Text>
+                    </PrintSection>
+                  </GridItem>
+                </Grid>
+
+                <Grid templateColumns={{ base: "1fr", lg: "1fr 1fr" }} gap={6}>
+                  <GridItem>
+                    <PrintSection title="Invoice Summary">
+                      <Flex justify="space-between">
+                        <Text color="gray.500">Invoice No</Text>
+                        <Text fontWeight="600">{invoice.invoiceNo || "—"}</Text>
+                      </Flex>
+                      <Flex justify="space-between">
+                        <Text color="gray.500">Invoice Date</Text>
+                        <Text fontWeight="600">
+                          {formatDate(invoice.invoiceDate)}
+                        </Text>
+                      </Flex>
+                      <Flex justify="space-between">
+                        <Text color="gray.500">Due Date</Text>
+                        <Text fontWeight="600">
+                          {formatDate(invoice.dueDate)}
+                        </Text>
+                      </Flex>
+                      <Flex justify="space-between">
+                        <Text color="gray.500">Tax Type</Text>
+                        <Text fontWeight="600">{invoice.taxType || "—"}</Text>
+                      </Flex>
+                      <Flex justify="space-between">
+                        <Text color="gray.500">Place of Supply</Text>
+                        <Text fontWeight="600">
+                          {invoice.placeOfSupplyStateCode || "—"}
+                        </Text>
+                      </Flex>
+                    </PrintSection>
+                  </GridItem>
+
+                  <GridItem>
+                    <PrintSection title="Amount Summary">
+                      <Flex justify="space-between">
+                        <Text color="gray.500">Taxable Amount</Text>
+                        <Text fontWeight="600">
+                          {formatCurrency(invoice.totalTaxableAmount)}
+                        </Text>
+                      </Flex>
+                      <Flex justify="space-between">
+                        <Text color="gray.500">CGST</Text>
+                        <Text fontWeight="600">
+                          {formatCurrency(invoice.totalCgstAmount)}
+                        </Text>
+                      </Flex>
+                      <Flex justify="space-between">
+                        <Text color="gray.500">SGST</Text>
+                        <Text fontWeight="600">
+                          {formatCurrency(invoice.totalSgstAmount)}
+                        </Text>
+                      </Flex>
+                      <Flex justify="space-between">
+                        <Text color="gray.500">IGST</Text>
+                        <Text fontWeight="600">
+                          {formatCurrency(invoice.totalIgstAmount)}
+                        </Text>
+                      </Flex>
+                      <Flex justify="space-between">
+                        <Text color="gray.500">Total Tax</Text>
+                        <Text fontWeight="600">
+                          {formatCurrency(invoice.totalTaxAmount)}
+                        </Text>
+                      </Flex>
+                      <Flex justify="space-between">
+                        <Text color="gray.500">Invoice Total</Text>
+                        <Text fontWeight="700" color="blue.600">
+                          {formatCurrency(invoice.totalInvoiceAmount)}
+                        </Text>
+                      </Flex>
+                    </PrintSection>
+                  </GridItem>
+                </Grid>
+
+                <Card
+                  variant="outline"
+                  sx={{
+                    breakInside: "avoid",
+                    pageBreakInside: "avoid",
+                  }}
+                >
+                  <CardBody>
+                    <Stack spacing={4}>
+                      <Heading size="sm">Line Items</Heading>
+
+                      <Box overflowX="auto">
+                        <Table
+                          variant="simple"
+                          size="sm"
+                          sx={{
+                            "@media print": {
+                              fontSize: "11px",
+                            },
+                          }}
+                        >
+                          <Thead>
+                            <Tr>
+                              <Th>#</Th>
+                              <Th>Product</Th>
+                              <Th>Description</Th>
+                              <Th>HSN/SAC</Th>
+                              <Th>Unit</Th>
+                              <Th isNumeric>Qty</Th>
+                              <Th isNumeric>Price</Th>
+                              <Th isNumeric>Taxable</Th>
+                              <Th isNumeric>GST %</Th>
+                              <Th isNumeric>Tax</Th>
+                              <Th isNumeric>Total</Th>
+                            </Tr>
+                          </Thead>
+                          <Tbody>
+                            {lines.length === 0 ? (
+                              <Tr>
+                                <Td colSpan={11}>
+                                  <Text
+                                    color="gray.500"
+                                    textAlign="center"
+                                    py={4}
+                                  >
+                                    No invoice lines found.
+                                  </Text>
+                                </Td>
+                              </Tr>
+                            ) : (
+                              lines.map((line) => (
+                                <Tr
+                                  key={line.id || line.lineNo}
+                                  sx={{
+                                    breakInside: "avoid",
+                                    pageBreakInside: "avoid",
+                                  }}
+                                >
+                                  <Td>{line.lineNo || "—"}</Td>
+                                  <Td>
+                                    <Text fontWeight="600">
+                                      {line.productName || "—"}
+                                    </Text>
+                                    <Text fontSize="xs" color="gray.500">
+                                      {line.productCode || ""}
+                                    </Text>
+                                  </Td>
+                                  <Td>{line.description || "—"}</Td>
+                                  <Td>{line.hsnSacCode || "—"}</Td>
+                                  <Td>{line.unitCode || "—"}</Td>
+                                  <Td isNumeric>
+                                    {formatNumber(line.quantity, 3)}
+                                  </Td>
+                                  <Td isNumeric>
+                                    {formatCurrency(line.unitPrice)}
+                                  </Td>
+                                  <Td isNumeric>
+                                    {formatCurrency(line.taxableAmount)}
+                                  </Td>
+                                  <Td isNumeric>
+                                    {formatNumber(line.gstRate, 2)}%
+                                  </Td>
+                                  <Td isNumeric>
+                                    {formatCurrency(taxAmount(line))}
+                                  </Td>
+                                  <Td isNumeric>
+                                    {formatCurrency(line.lineTotalAmount)}
+                                  </Td>
+                                </Tr>
+                              ))
                             )}
-                          </Stack>
-                        </Td>
+                          </Tbody>
+                        </Table>
+                      </Box>
+                    </Stack>
+                  </CardBody>
+                </Card>
 
-                        <Td>{line.hsnSacCode || "—"}</Td>
-                        <Td>{line.unitCode || "—"}</Td>
-                        <Td isNumeric>{line.quantity ?? 0}</Td>
-                        <Td isNumeric>{formatCurrency(line.unitPrice)}</Td>
-                        <Td isNumeric>{formatCurrency(line.taxableAmount)}</Td>
-                        <Td isNumeric>{Number(line.gstRate || 0).toFixed(2)}%</Td>
-                        <Td isNumeric>{formatCurrency(line.lineTotalAmount)}</Td>
-                      </Tr>
-                    ))}
-                  </Tbody>
-                </Table>
-              </Box>
+                <Grid templateColumns={{ base: "1fr", lg: "1fr 1fr" }} gap={6}>
+                  <GridItem>
+                    <PrintSection title="Notes">
+                      <Text color="gray.700" whiteSpace="pre-wrap">
+                        {invoice.notes || "—"}
+                      </Text>
+                    </PrintSection>
+                  </GridItem>
+
+                  <GridItem>
+                    <PrintSection title="Terms and Conditions">
+                      <Text color="gray.700" whiteSpace="pre-wrap">
+                        {invoice.termsAndConditions || "—"}
+                      </Text>
+                    </PrintSection>
+                  </GridItem>
+                </Grid>
+
+                <Flex
+                  justify="flex-end"
+                  pt={2}
+                  sx={{
+                    breakInside: "avoid",
+                    pageBreakInside: "avoid",
+                  }}
+                >
+                  <Box textAlign="right">
+                    <Text fontSize="sm" color="gray.500">
+                      This is a system-generated invoice.
+                    </Text>
+                  </Box>
+                </Flex>
+              </Stack>
             </CardBody>
           </Card>
-        </GridItem>
-
-        <GridItem>
-          <Stack spacing={6}>
-            <Card borderWidth="1px" borderColor="gray.200" shadow="sm" borderRadius="xl">
-              <CardBody>
-                <Heading size="md" mb={4}>
-                  Customer Snapshot
-                </Heading>
-
-                <Divider mb={2} />
-
-                <InfoRow label="Customer Code" value={invoice.customerCode} />
-                <Divider />
-
-                <InfoRow label="Legal Name" value={invoice.customerLegalName} />
-                <Divider />
-
-                <InfoRow label="Trade Name" value={invoice.customerTradeName || "—"} />
-                <Divider />
-
-                <InfoRow label="GSTIN" value={invoice.customerGstin || "—"} />
-                <Divider />
-
-                <InfoRow label="Billing Address Line 1" value={invoice.customerBillingAddressLine1 || "—"} />
-                <Divider />
-
-                <InfoRow label="Billing Address Line 2" value={invoice.customerBillingAddressLine2 || "—"} />
-                <Divider />
-
-                <InfoRow label="City" value={invoice.customerBillingCity || "—"} />
-                <Divider />
-
-                <InfoRow label="State" value={invoice.customerBillingState || "—"} />
-                <Divider />
-
-                <InfoRow label="State Code" value={invoice.customerBillingStateCode || "—"} />
-                <Divider />
-
-                <InfoRow label="Pincode" value={invoice.customerBillingPincode || "—"} />
-                <Divider />
-
-                <InfoRow label="Country" value={invoice.customerBillingCountry || "—"} />
-              </CardBody>
-            </Card>
-
-            <Card borderWidth="1px" borderColor="gray.200" shadow="sm" borderRadius="xl">
-              <CardBody>
-                <Heading size="md" mb={4}>
-                  Seller Snapshot
-                </Heading>
-
-                <Divider mb={2} />
-
-                <InfoRow label="Legal Name" value={invoice.sellerLegalName} />
-                <Divider />
-
-                <InfoRow label="GSTIN" value={invoice.sellerGstin} />
-                <Divider />
-
-                <InfoRow label="Address Line 1" value={invoice.sellerAddressLine1 || "—"} />
-                <Divider />
-
-                <InfoRow label="Address Line 2" value={invoice.sellerAddressLine2 || "—"} />
-                <Divider />
-
-                <InfoRow label="City" value={invoice.sellerCity || "—"} />
-                <Divider />
-
-                <InfoRow label="State" value={invoice.sellerState || "—"} />
-                <Divider />
-
-                <InfoRow label="State Code" value={invoice.sellerStateCode || "—"} />
-                <Divider />
-
-                <InfoRow label="Pincode" value={invoice.sellerPincode || "—"} />
-                <Divider />
-
-                <InfoRow label="Country" value={invoice.sellerCountry || "—"} />
-              </CardBody>
-            </Card>
-
-            <Card borderWidth="1px" borderColor="gray.200" shadow="sm" borderRadius="xl">
-              <CardBody>
-                <Heading size="md" mb={4}>
-                  Tax Summary
-                </Heading>
-
-                <Divider mb={2} />
-
-                <InfoRow label="Total Quantity" value={String(totals.totalQuantity)} />
-                <Divider />
-
-                <InfoRow
-                  label="Taxable Amount"
-                  value={formatCurrency(invoice.totalTaxableAmount)}
-                />
-                <Divider />
-
-                <InfoRow
-                  label="CGST"
-                  value={formatCurrency(invoice.totalCgstAmount)}
-                />
-                <Divider />
-
-                <InfoRow
-                  label="SGST"
-                  value={formatCurrency(invoice.totalSgstAmount)}
-                />
-                <Divider />
-
-                <InfoRow
-                  label="IGST"
-                  value={formatCurrency(invoice.totalIgstAmount)}
-                />
-                <Divider />
-
-                <InfoRow
-                  label="Total Tax"
-                  value={formatCurrency(invoice.totalTaxAmount)}
-                />
-                <Divider />
-
-                <InfoRow
-                  label="Grand Total"
-                  value={formatCurrency(invoice.totalInvoiceAmount)}
-                />
-              </CardBody>
-            </Card>
-          </Stack>
-        </GridItem>
-      </Grid>
+        </Stack>
+      </Box>
     </Stack>
   );
 }

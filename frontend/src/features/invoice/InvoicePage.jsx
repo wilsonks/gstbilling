@@ -8,6 +8,7 @@ import {
   Flex,
   Heading,
   HStack,
+  IconButton,
   Input,
   InputGroup,
   InputLeftElement,
@@ -27,13 +28,33 @@ import {
   Tr,
   useToast,
 } from "@chakra-ui/react";
-import { FileText, Plus, RefreshCw, Search } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { cancelInvoice, getInvoiceStats, getInvoicesPage } from "./invoiceApi";
+import {
+  Download,
+  Eye,
+  FileText,
+  Plus,
+  Printer,
+  RefreshCw,
+  Search,
+} from "lucide-react";
+import { useNavigate, generatePath } from "react-router-dom";
+import {
+  cancelInvoice,
+  exportInvoicePdf,
+  previewInvoicePdf,
+  getInvoiceStats,
+  getInvoicesPage,
+  getInvoicePdfUrl,
+} from "./invoiceApi";
 
 function MetricCard({ label, value, helpText, loading = false }) {
   return (
-    <Card borderWidth="1px" borderColor="gray.200" shadow="sm" borderRadius="xl">
+    <Card
+      borderWidth="1px"
+      borderColor="gray.200"
+      shadow="sm"
+      borderRadius="xl"
+    >
       <CardBody>
         <Stat>
           <StatLabel color="gray.500">{label}</StatLabel>
@@ -71,6 +92,7 @@ export default function InvoicePage() {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [downloadingId, setDownloadingId] = useState(null);
 
   const [pageInfo, setPageInfo] = useState({
     number: 0,
@@ -112,7 +134,7 @@ export default function InvoicePage() {
         statsData || {
           total: 0,
           recentInvoices: [],
-        }
+        },
       );
     } catch (error) {
       toast({
@@ -144,16 +166,19 @@ export default function InvoicePage() {
 
   const issuedCount = useMemo(
     () => rows.filter((item) => item.status === "ISSUED").length,
-    [rows]
+    [rows],
   );
 
   const cancelledCount = useMemo(
     () => rows.filter((item) => item.status === "CANCELLED").length,
-    [rows]
+    [rows],
   );
 
   const totalValue = useMemo(() => {
-    return rows.reduce((sum, item) => sum + Number(item.totalInvoiceAmount || 0), 0);
+    return rows.reduce(
+      (sum, item) => sum + Number(item.totalInvoiceAmount || 0),
+      0,
+    );
   }, [rows]);
 
   const handleSearch = async () => {
@@ -183,6 +208,94 @@ export default function InvoicePage() {
     }
   };
 
+  const handleDownloadPdf = async (invoice) => {
+    setDownloadingId(invoice.id);
+    try {
+      const response = await exportInvoicePdf(invoice.id);
+
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+
+      let fileName = `${invoice.invoiceNo || "invoice"}.pdf`;
+      const disposition = response.headers?.["content-disposition"];
+      const match = disposition?.match(/filename="(.+)"/);
+      if (match?.[1]) {
+        fileName = match[1];
+      }
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: "Invoice PDF downloaded",
+        status: "success",
+        duration: 2000,
+        isClosable: true,
+      });
+    } catch (error) {
+      toast({
+        title: "Failed to export invoice PDF",
+        description: error?.response?.data?.message || "Please try again.",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  // const handlePrintInvoice = (invoice) => {
+  //   const path = generatePath("/invoices/:id", { id: invoice.id });
+  //   window.open(`${window.location.origin}${path}?print=1`, "_blank");
+  // };
+
+  // const handlePrintInvoice = (invoice) => {
+  //   window.open(
+  //     getInvoicePdfUrl(invoice.id, "inline"),
+  //     "_blank",
+  //     "noopener,noreferrer",
+  //   );
+  // };
+
+  const handlePrintInvoice = async (invoice) => {
+    try {
+      const response = await previewInvoicePdf(invoice.id);
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+
+      const newWindow = window.open(url, "_blank", "noopener,noreferrer");
+
+      if (!newWindow) {
+        toast({
+          title: "Popup blocked",
+          description: "Please allow popups to preview the invoice PDF.",
+          status: "warning",
+          duration: 3000,
+          isClosable: true,
+        });
+        return;
+      }
+
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+      }, 60000);
+    } catch (error) {
+      toast({
+        title: "Failed to open invoice PDF",
+        description: error?.response?.data?.message || "Please try again.",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  };
+
   return (
     <Stack spacing={6}>
       <Flex
@@ -194,7 +307,7 @@ export default function InvoicePage() {
         <Box>
           <Heading size="lg">Invoices</Heading>
           <Text color="gray.500" mt={1}>
-            View, search, and manage issued invoices.
+            View, search, manage, print, and export invoices.
           </Text>
         </Box>
 
@@ -239,7 +352,12 @@ export default function InvoicePage() {
         />
       </SimpleGrid>
 
-      <Card borderWidth="1px" borderColor="gray.200" shadow="sm" borderRadius="xl">
+      <Card
+        borderWidth="1px"
+        borderColor="gray.200"
+        shadow="sm"
+        borderRadius="xl"
+      >
         <CardBody>
           <Stack spacing={4}>
             <Flex
@@ -332,7 +450,9 @@ export default function InvoicePage() {
 
                         <Td>
                           <Stack spacing={0}>
-                            <Text fontWeight="600">{invoice.customerLegalName || "—"}</Text>
+                            <Text fontWeight="600">
+                              {invoice.customerLegalName || "—"}
+                            </Text>
                             <Text fontSize="xs" color="gray.500">
                               {invoice.customerCode || "—"}
                             </Text>
@@ -341,9 +461,15 @@ export default function InvoicePage() {
 
                         <Td>{invoice.taxType?.replaceAll("_", " ") || "—"}</Td>
 
-                        <Td isNumeric>{formatCurrency(invoice.totalTaxableAmount)}</Td>
-                        <Td isNumeric>{formatCurrency(invoice.totalTaxAmount)}</Td>
-                        <Td isNumeric>{formatCurrency(invoice.totalInvoiceAmount)}</Td>
+                        <Td isNumeric>
+                          {formatCurrency(invoice.totalTaxableAmount)}
+                        </Td>
+                        <Td isNumeric>
+                          {formatCurrency(invoice.totalTaxAmount)}
+                        </Td>
+                        <Td isNumeric>
+                          {formatCurrency(invoice.totalInvoiceAmount)}
+                        </Td>
 
                         <Td>
                           <Badge
@@ -351,8 +477,8 @@ export default function InvoicePage() {
                               invoice.status === "CANCELLED"
                                 ? "red"
                                 : invoice.status === "ISSUED"
-                                ? "green"
-                                : "gray"
+                                  ? "green"
+                                  : "gray"
                             }
                           >
                             {invoice.status || "—"}
@@ -360,14 +486,34 @@ export default function InvoicePage() {
                         </Td>
 
                         <Td>
-                          <HStack spacing={2}>
+                          <HStack spacing={2} flexWrap="wrap">
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => navigate(`/invoices/${invoice.id}`)}
+                              leftIcon={<Eye size={14} />}
+                              onClick={() =>
+                                navigate(`/invoices/${invoice.id}`)
+                              }
                             >
                               View
                             </Button>
+
+                            <IconButton
+                              size="sm"
+                              variant="outline"
+                              aria-label="Print invoice"
+                              icon={<Printer size={14} />}
+                              onClick={() => handlePrintInvoice(invoice)}
+                            />
+
+                            <IconButton
+                              size="sm"
+                              variant="outline"
+                              aria-label="Download invoice PDF"
+                              icon={<Download size={14} />}
+                              onClick={() => handleDownloadPdf(invoice)}
+                              isLoading={downloadingId === invoice.id}
+                            />
 
                             {invoice.status !== "CANCELLED" && (
                               <Button
@@ -390,7 +536,8 @@ export default function InvoicePage() {
 
             {!loading && filteredRows.length > 0 && (
               <Text fontSize="sm" color="gray.500">
-                Showing {filteredRows.length} of {pageInfo.totalElements} invoice(s)
+                Showing {filteredRows.length} of {pageInfo.totalElements}{" "}
+                invoice(s)
               </Text>
             )}
           </Stack>
