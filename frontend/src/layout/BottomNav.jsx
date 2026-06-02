@@ -9,11 +9,13 @@ import {
   LayoutDashboard,
   Building2,
   UserCog,
+  ReceiptText,
 } from "lucide-react";
 
 const tenantItems = [
   { label: "Home", path: "/dashboard", icon: Home },
   { label: "Invoices", path: "/invoices", icon: FileText },
+  { label: "Proforma", path: "/proforma-invoices", icon: ReceiptText },
   { label: "Products", path: "/products", icon: Package },
   { label: "Customers", path: "/customers", icon: Users },
 ];
@@ -24,7 +26,10 @@ const adminItems = [
   { label: "Users", path: "/admin/users", icon: UserCog },
 ];
 
-const hiddenRoutes = ["/invoices/new"];
+const hiddenRoutes = [
+  "/invoices/new",
+  "/proforma-invoices/new",
+];
 
 export default function BottomNav({ type = "tenant" }) {
   const navigate = useNavigate();

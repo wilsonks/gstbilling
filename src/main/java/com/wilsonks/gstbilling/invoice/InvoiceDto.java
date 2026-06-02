@@ -1,5 +1,6 @@
 package com.wilsonks.gstbilling.invoice;
 
+import com.wilsonks.gstbilling.invoice.sequence.DocumentType;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -13,6 +14,7 @@ public class InvoiceDto {
     private Long tenantId;
     private Long companyId;
 
+    private DocumentType documentType;
     private String invoiceNo;
     private LocalDate invoiceDate;
     private LocalDate dueDate;

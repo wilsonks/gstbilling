@@ -80,7 +80,8 @@ export default function Sidebar({ onNavigate }) {
         TRANSACTIONS
       </Text>
       <VStack align="stretch" spacing={2}>
-        <Item label="Invoices" path="/invoices" />
+        <Item label="Tax Invoices" path="/invoices" />
+        <Item label="Proforma Invoices" path="/proforma-invoices" />
       </VStack>
     </Box>
   );

@@ -15,6 +15,7 @@ import com.wilsonks.gstbilling.context.TenantContext;
 import com.wilsonks.gstbilling.invoice.Invoice;
 import com.wilsonks.gstbilling.invoice.InvoiceLine;
 import com.wilsonks.gstbilling.invoice.InvoiceRepository;
+import com.wilsonks.gstbilling.invoice.sequence.DocumentType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -64,7 +65,7 @@ public class InvoicePdfExportService {
         Font normalFont = FontFactory.getFont(FontFactory.HELVETICA, 10);
         Font boldFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10);
 
-        Paragraph title = new Paragraph("TAX INVOICE", titleFont);
+        Paragraph title = new Paragraph(resolveDocumentTitle(invoice.getDocumentType()), titleFont);
         title.setAlignment(Element.ALIGN_CENTER);
         title.setSpacingAfter(12f);
         document.add(title);
@@ -74,8 +75,8 @@ public class InvoicePdfExportService {
         summary.setSpacingAfter(10f);
         summary.setWidths(new float[]{1f, 1f});
 
-        summary.addCell(infoCell("Invoice No", valueOrDash(invoice.getInvoiceNo()), boldFont, normalFont));
-        summary.addCell(infoCell("Invoice Date", formatDate(invoice.getInvoiceDate()), boldFont, normalFont));
+        summary.addCell(infoCell("Document No", valueOrDash(invoice.getInvoiceNo()), boldFont, normalFont));
+        summary.addCell(infoCell("Document Date", formatDate(invoice.getInvoiceDate()), boldFont, normalFont));
         summary.addCell(infoCell("Due Date", formatDate(invoice.getDueDate()), boldFont, normalFont));
         summary.addCell(infoCell("Status", valueOrDash(invoice.getStatus() != null ? invoice.getStatus().name() : null), boldFont, normalFont));
         summary.addCell(infoCell("Tax Type", valueOrDash(invoice.getTaxType() != null ? invoice.getTaxType().name() : null), boldFont, normalFont));
@@ -172,7 +173,7 @@ public class InvoicePdfExportService {
         totals.addCell(totalLabelCell("Total Tax", boldFont));
         totals.addCell(totalValueCell(formatAmount(invoice.getTotalTaxAmount()), normalFont));
 
-        totals.addCell(totalLabelCell("Invoice Total", boldFont));
+        totals.addCell(totalLabelCell("Document Total", boldFont));
         totals.addCell(totalValueCell(formatAmount(invoice.getTotalInvoiceAmount()), boldFont));
 
         document.add(totals);
@@ -200,6 +201,19 @@ public class InvoicePdfExportService {
 
         document.close();
         return out.toByteArray();
+    }
+
+    private String resolveDocumentTitle(DocumentType documentType) {
+        if (documentType == null) {
+            return "TAX INVOICE";
+        }
+
+        return switch (documentType) {
+            case TAX_INVOICE -> "TAX INVOICE";
+            case PROFORMA_INVOICE -> "PROFORMA INVOICE";
+            case CREDIT_NOTE -> "CREDIT NOTE";
+            case DEBIT_NOTE -> "DEBIT NOTE";
+        };
     }
 
     private PdfPCell infoCell(String label, String value, Font labelFont, Font valueFont) {

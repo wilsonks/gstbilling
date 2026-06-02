@@ -111,18 +111,38 @@ public class InvoiceSequenceService {
     public NextSequenceNumberDto nextNumber(DocumentType documentType) {
         Long tenantId = getTenantIdOrThrow();
         Long companyId = getCompanyIdOrThrow();
+        return nextNumberInternal(tenantId, companyId, documentType);
+    }
+
+    @Transactional
+    public NextSequenceNumberDto nextNumberForSeed(Long tenantId, Long companyId, DocumentType documentType) {
+        if (tenantId == null) {
+            throw new IllegalArgumentException("Tenant id is required");
+        }
+        if (companyId == null) {
+            throw new IllegalArgumentException("Company id is required");
+        }
+        if (documentType == null) {
+            throw new IllegalArgumentException("Document type is required");
+        }
+
+        return nextNumberInternal(tenantId, companyId, documentType);
+    }
+
+    private NextSequenceNumberDto nextNumberInternal(Long tenantId, Long companyId, DocumentType documentType) {
         String financialYear = FinancialYearUtil.currentFinancialYear();
 
         InvoiceSequence sequence = repo.findForUpdate(tenantId, companyId, documentType, financialYear)
                 .orElseThrow(() -> new IllegalArgumentException(
-                        "No active invoice sequence configured for current company, document type, and financial year"
+                        "No active invoice sequence configured for tenant, company, document type, and financial year"
                 ));
 
         if (!sequence.isActive()) {
             throw new IllegalArgumentException("Invoice sequence is inactive");
         }
 
-        long nextNumber = sequence.getCurrentNumber() + 1;
+        long currentNumber = sequence.getCurrentNumber() == null ? 0L : sequence.getCurrentNumber();
+        long nextNumber = currentNumber + 1L;
         sequence.setCurrentNumber(nextNumber);
         repo.save(sequence);
 
@@ -237,7 +257,12 @@ public class InvoiceSequenceService {
     private String formatNumber(InvoiceSequence sequence, Long number) {
         String prefix = sequence.getPrefix() == null ? "" : sequence.getPrefix();
         String suffix = sequence.getSuffix() == null ? "" : sequence.getSuffix();
-        String padded = String.format("%0" + sequence.getPaddingLength() + "d", number);
+        int paddingLength = sequence.getPaddingLength() == null ? 0 : sequence.getPaddingLength();
+
+        String padded = paddingLength > 0
+                ? String.format("%0" + paddingLength + "d", number)
+                : String.valueOf(number);
+
         return prefix + padded + suffix;
     }
 }

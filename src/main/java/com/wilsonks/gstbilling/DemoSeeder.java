@@ -13,11 +13,10 @@ import com.wilsonks.gstbilling.customer.Customer;
 import com.wilsonks.gstbilling.customer.CustomerRepository;
 import com.wilsonks.gstbilling.customer.CustomerType;
 import com.wilsonks.gstbilling.customer.GstRegistrationType;
-import com.wilsonks.gstbilling.invoice.Invoice;
-import com.wilsonks.gstbilling.invoice.InvoiceLine;
+import com.wilsonks.gstbilling.invoice.CreateInvoiceLineRequest;
+import com.wilsonks.gstbilling.invoice.CreateInvoiceRequest;
 import com.wilsonks.gstbilling.invoice.InvoiceRepository;
-import com.wilsonks.gstbilling.invoice.InvoiceStatus;
-import com.wilsonks.gstbilling.invoice.TaxType;
+import com.wilsonks.gstbilling.invoice.InvoiceService;
 import com.wilsonks.gstbilling.invoice.sequence.DocumentType;
 import com.wilsonks.gstbilling.invoice.sequence.FinancialYearUtil;
 import com.wilsonks.gstbilling.invoice.sequence.InvoiceSequence;
@@ -85,6 +84,7 @@ public class DemoSeeder implements ApplicationRunner {
     private final CustomerRepository customerRepository;
     private final InvoiceSequenceRepository invoiceSequenceRepository;
     private final InvoiceRepository invoiceRepository;
+    private final InvoiceService invoiceService;
 
     @Override
     public void run(ApplicationArguments args) {
@@ -474,20 +474,44 @@ public class DemoSeeder implements ApplicationRunner {
     }
 
     private void upsertInvoiceSequence(Long tenantId, Long companyId, String financialYear) {
+        upsertInvoiceSequenceForDocumentType(
+                tenantId,
+                companyId,
+                financialYear,
+                DocumentType.TAX_INVOICE,
+                "INV/" + financialYear + "/"
+        );
+
+        upsertInvoiceSequenceForDocumentType(
+                tenantId,
+                companyId,
+                financialYear,
+                DocumentType.PROFORMA_INVOICE,
+                "PI/" + financialYear + "/"
+        );
+    }
+
+    private void upsertInvoiceSequenceForDocumentType(
+            Long tenantId,
+            Long companyId,
+            String financialYear,
+            DocumentType documentType,
+            String prefix
+    ) {
         InvoiceSequence existing = invoiceSequenceRepository
                 .findByTenantIdAndCompanyIdAndDocumentTypeAndFinancialYear(
                         tenantId,
                         companyId,
-                        DocumentType.TAX_INVOICE,
+                        documentType,
                         financialYear
                 )
                 .orElseGet(InvoiceSequence::new);
 
         existing.setTenantId(tenantId);
         existing.setCompanyId(companyId);
-        existing.setDocumentType(DocumentType.TAX_INVOICE);
+        existing.setDocumentType(documentType);
         existing.setFinancialYear(financialYear);
-        existing.setPrefix("INV/" + financialYear + "/");
+        existing.setPrefix(prefix);
         existing.setSuffix(null);
         existing.setPaddingLength(5);
         existing.setResetPolicy(SequenceResetPolicy.FINANCIAL_YEAR);
@@ -507,18 +531,32 @@ public class DemoSeeder implements ApplicationRunner {
             int globalCompanyIndex,
             String financialYear
     ) {
+        List<Product> products = productRepository.findByTenantId(tenant.getTenantId());
+        if (products.size() < 2) {
+            return;
+        }
+
         for (int invoiceOffset = 1; invoiceOffset <= INVOICES_PER_COMPANY; invoiceOffset++) {
-            int invoiceSeed = (globalCompanyIndex * 10) + invoiceOffset;
             Customer customer = customers.get((invoiceOffset - 1) % customers.size());
 
             seedSingleInvoice(
                     tenant.getTenantId(),
                     company,
                     customer,
-                    globalCompanyIndex,
+                    products,
                     invoiceOffset,
-                    invoiceSeed,
-                    financialYear
+                    globalCompanyIndex,
+                    DocumentType.TAX_INVOICE
+            );
+
+            seedSingleInvoice(
+                    tenant.getTenantId(),
+                    company,
+                    customer,
+                    products,
+                    invoiceOffset,
+                    globalCompanyIndex,
+                    DocumentType.PROFORMA_INVOICE
             );
         }
     }
@@ -527,205 +565,57 @@ public class DemoSeeder implements ApplicationRunner {
             Long tenantId,
             Company company,
             Customer customer,
-            int globalCompanyIndex,
+            List<Product> products,
             int invoiceOffset,
-            int invoiceSeed,
-            String financialYear
+            int globalCompanyIndex,
+            DocumentType documentType
     ) {
-        String invoiceNo = "INV/" + financialYear + "/" + company.getId() + "-" + String.format("%03d", invoiceOffset);
-
-        if (invoiceRepository.findByTenantIdAndCompanyIdAndInvoiceNo(tenantId, company.getId(), invoiceNo).isPresent()) {
-            return;
-        }
-
-        List<Product> products = productRepository.findByTenantId(tenantId);
-        if (products.size() < 2) {
-            return;
-        }
+        int invoiceSeed = (globalCompanyIndex * 100) + invoiceOffset + (documentType == DocumentType.PROFORMA_INVOICE ? 1000 : 0);
 
         Product firstProduct = products.get((invoiceOffset - 1) % products.size());
         Product secondProduct = products.get(invoiceOffset % products.size());
 
-        HsnSacMaster firstHsn = hsnSacMasterRepository.findById(firstProduct.getHsnSacId())
-                .orElseThrow(() -> new IllegalStateException("HSN/SAC missing for product " + firstProduct.getId()));
-        UnitMaster firstUnit = unitMasterRepository.findById(firstProduct.getUnitId())
-                .orElseThrow(() -> new IllegalStateException("Unit missing for product " + firstProduct.getId()));
-        GstSlabMaster firstSlab = gstSlabMasterRepository.findById(firstProduct.getGstSlabId())
-                .orElseThrow(() -> new IllegalStateException("GST slab missing for product " + firstProduct.getId()));
+        CreateInvoiceRequest request = new CreateInvoiceRequest();
+        request.setCustomerId(customer.getId());
+        request.setDocumentType(documentType);
+        request.setInvoiceDate(LocalDate.now().minusDays(invoiceSeed % 25));
+        request.setNotes("Demo " + resolveDocumentLabel(documentType).toLowerCase() + " generated by seed data");
+        request.setTermsAndConditions("Payment due within agreed credit period.");
 
-        HsnSacMaster secondHsn = hsnSacMasterRepository.findById(secondProduct.getHsnSacId())
-                .orElseThrow(() -> new IllegalStateException("HSN/SAC missing for product " + secondProduct.getId()));
-        UnitMaster secondUnit = unitMasterRepository.findById(secondProduct.getUnitId())
-                .orElseThrow(() -> new IllegalStateException("Unit missing for product " + secondProduct.getId()));
-        GstSlabMaster secondSlab = gstSlabMasterRepository.findById(secondProduct.getGstSlabId())
-                .orElseThrow(() -> new IllegalStateException("GST slab missing for product " + secondProduct.getId()));
+        CreateInvoiceLineRequest line1 = new CreateInvoiceLineRequest();
+        line1.setProductId(firstProduct.getId());
+        line1.setDescription(firstProduct.getDescription());
+        line1.setQuantity(new BigDecimal("1.000"));
+        line1.setUnitPrice(firstProduct.getDefaultPrice());
 
-        TaxType taxType = resolveTaxType(company.getStateCode(), customer.getBillingStateCode(), customer.getGstin());
+        CreateInvoiceLineRequest line2 = new CreateInvoiceLineRequest();
+        line2.setProductId(secondProduct.getId());
+        line2.setDescription(secondProduct.getDescription());
+        line2.setQuantity(BigDecimal.valueOf((invoiceOffset % 3) + 1L).setScale(3));
+        line2.setUnitPrice(secondProduct.getDefaultPrice());
 
-        Invoice invoice = new Invoice();
-        invoice.setTenantId(tenantId);
-        invoice.setCompanyId(company.getId());
-        invoice.setInvoiceNo(invoiceNo);
-        invoice.setInvoiceDate(LocalDate.now().minusDays(invoiceSeed % 25));
-        invoice.setDueDate(invoice.getInvoiceDate().plusDays(customer.getPaymentTermsDays()));
-        invoice.setStatus(invoiceSeed % 7 == 0 ? InvoiceStatus.CANCELLED : InvoiceStatus.ISSUED);
-        invoice.setTaxType(taxType);
-        invoice.setPlaceOfSupplyStateCode(customer.getBillingStateCode());
-        invoice.setNotes("Demo invoice generated by seed data");
-        invoice.setTermsAndConditions("Payment due within agreed credit period.");
+        request.setLines(List.of(line1, line2));
 
-        snapshotCustomer(invoice, customer);
-        snapshotSeller(invoice, company);
-
-        List<InvoiceLine> lines = new ArrayList<>();
-        lines.add(buildInvoiceLine(
-                invoice,
-                1,
-                firstProduct,
-                firstHsn,
-                firstUnit,
-                firstSlab,
-                new BigDecimal("1.000"),
-                firstProduct.getDefaultPrice(),
-                taxType
-        ));
-
-        lines.add(buildInvoiceLine(
-                invoice,
-                2,
-                secondProduct,
-                secondHsn,
-                secondUnit,
-                secondSlab,
-                new BigDecimal((invoiceOffset % 3) + ".000"),
-                secondProduct.getDefaultPrice(),
-                taxType
-        ));
-
-        invoice.replaceLines(lines);
-
-        BigDecimal totalTaxable = money(BigDecimal.ZERO);
-        BigDecimal totalSgst = money(BigDecimal.ZERO);
-        BigDecimal totalCgst = money(BigDecimal.ZERO);
-        BigDecimal totalIgst = money(BigDecimal.ZERO);
-
-        for (InvoiceLine line : lines) {
-            totalTaxable = totalTaxable.add(line.getTaxableAmount());
-            totalCgst = totalCgst.add(line.getCgstAmount());
-            totalSgst = totalSgst.add(line.getSgstAmount());
-            totalIgst = totalIgst.add(line.getIgstAmount());
+        try {
+            invoiceService.createForSeed(tenantId, company.getId(), request);
+        } catch (IllegalArgumentException ex) {
+            if (!isDuplicateInvoiceNumberError(ex)) {
+                throw ex;
+            }
         }
-
-        BigDecimal totalTax = totalCgst.add(totalSgst).add(totalIgst);
-        BigDecimal totalInvoiceAmount = totalTaxable.add(totalTax);
-
-        invoice.setTotalTaxableAmount(totalTaxable);
-        invoice.setTotalCgstAmount(totalCgst);
-        invoice.setTotalSgstAmount(totalSgst);
-        invoice.setTotalIgstAmount(totalIgst);
-        invoice.setTotalTaxAmount(totalTax);
-        invoice.setTotalInvoiceAmount(totalInvoiceAmount);
-
-        invoiceRepository.save(invoice);
-
-        InvoiceSequence sequence = invoiceSequenceRepository
-                .findByTenantIdAndCompanyIdAndDocumentTypeAndFinancialYear(
-                        tenantId,
-                        company.getId(),
-                        DocumentType.TAX_INVOICE,
-                        financialYear
-                )
-                .orElseThrow(() -> new IllegalStateException("Invoice sequence missing"));
-
-        long expectedCurrent = Math.max(sequence.getCurrentNumber(), invoiceOffset);
-        sequence.setCurrentNumber(expectedCurrent);
-        invoiceSequenceRepository.save(sequence);
     }
 
-    private InvoiceLine buildInvoiceLine(
-            Invoice invoice,
-            int lineNo,
-            Product product,
-            HsnSacMaster hsnSac,
-            UnitMaster unit,
-            GstSlabMaster slab,
-            BigDecimal quantity,
-            BigDecimal unitPrice,
-            TaxType taxType
-    ) {
-        BigDecimal qty = quantity.setScale(3, BigDecimal.ROUND_HALF_UP);
-        BigDecimal price = money(unitPrice);
-        BigDecimal taxable = money(qty.multiply(price));
-
-        BigDecimal gstRate = slab.getRate().setScale(2, BigDecimal.ROUND_HALF_UP);
-        BigDecimal cgstRate = BigDecimal.ZERO.setScale(2, BigDecimal.ROUND_HALF_UP);
-        BigDecimal sgstRate = BigDecimal.ZERO.setScale(2, BigDecimal.ROUND_HALF_UP);
-        BigDecimal igstRate = BigDecimal.ZERO.setScale(2, BigDecimal.ROUND_HALF_UP);
-
-        if (taxType == TaxType.INTRA_STATE) {
-            cgstRate = gstRate.divide(new BigDecimal("2"), 2, BigDecimal.ROUND_HALF_UP);
-            sgstRate = gstRate.divide(new BigDecimal("2"), 2, BigDecimal.ROUND_HALF_UP);
-        } else if (taxType == TaxType.INTER_STATE) {
-            igstRate = gstRate;
-        }
-
-        BigDecimal cgstAmount = percentOf(taxable, cgstRate);
-        BigDecimal sgstAmount = percentOf(taxable, sgstRate);
-        BigDecimal igstAmount = percentOf(taxable, igstRate);
-        BigDecimal lineTotal = taxable.add(cgstAmount).add(sgstAmount).add(igstAmount);
-
-        return InvoiceLine.builder()
-                .invoice(invoice)
-                .lineNo(lineNo)
-                .productId(product.getId())
-                .productCode(product.getCode())
-                .productName(product.getName())
-                .description(product.getDescription())
-                .hsnSacCode(hsnSac.getCode())
-                .unitCode(unit.getCode())
-                .quantity(qty)
-                .unitPrice(price)
-                .taxableAmount(taxable)
-                .gstRate(gstRate)
-                .cgstRate(cgstRate)
-                .sgstRate(sgstRate)
-                .igstRate(igstRate)
-                .cgstAmount(cgstAmount)
-                .sgstAmount(sgstAmount)
-                .igstAmount(igstAmount)
-                .lineTotalAmount(lineTotal)
-                .build();
+    private boolean isDuplicateInvoiceNumberError(IllegalArgumentException ex) {
+        return ex.getMessage() != null && ex.getMessage().contains("Invoice");
     }
 
-    private void snapshotCustomer(Invoice invoice, Customer customer) {
-        invoice.setCustomerId(customer.getId());
-        invoice.setCustomerCode(customer.getCode());
-        invoice.setCustomerLegalName(customer.getLegalName());
-        invoice.setCustomerTradeName(customer.getTradeName());
-        invoice.setCustomerGstin(customer.getGstin());
-        invoice.setCustomerBillingAddressLine1(customer.getBillingAddressLine1());
-        invoice.setCustomerBillingAddressLine2(customer.getBillingAddressLine2());
-        invoice.setCustomerBillingCity(customer.getBillingCity());
-        invoice.setCustomerBillingState(customer.getBillingState());
-        invoice.setCustomerBillingStateCode(customer.getBillingStateCode());
-        invoice.setCustomerBillingPincode(customer.getBillingPincode());
-        invoice.setCustomerBillingCountry(customer.getBillingCountry());
-    }
-
-    private void snapshotSeller(Invoice invoice, Company company) {
-        invoice.setSellerLegalName(
-                company.getLegalName() != null && !company.getLegalName().isBlank()
-                        ? company.getLegalName()
-                        : company.getName()
-        );
-        invoice.setSellerGstin(company.getGstin());
-        invoice.setSellerAddressLine1(company.getAddressLine1());
-        invoice.setSellerAddressLine2(company.getAddressLine2());
-        invoice.setSellerCity(company.getCity());
-        invoice.setSellerState(company.getState());
-        invoice.setSellerStateCode(company.getStateCode());
-        invoice.setSellerPincode(company.getPincode());
-        invoice.setSellerCountry(company.getCountry());
+    private String resolveDocumentLabel(DocumentType documentType) {
+        return switch (documentType) {
+            case PROFORMA_INVOICE -> "Proforma Invoice";
+            case TAX_INVOICE -> "Tax Invoice";
+            case CREDIT_NOTE -> "Credit Note";
+            case DEBIT_NOTE -> "Debit Note";
+        };
     }
 
     private void upsertProduct(
@@ -889,21 +779,6 @@ public class DemoSeeder implements ApplicationRunner {
         };
     }
 
-    private TaxType resolveTaxType(String sellerStateCode, String buyerStateCode, String buyerGstin) {
-        if (buyerGstin == null || buyerGstin.isBlank()) {
-            if (sellerStateCode != null && sellerStateCode.equalsIgnoreCase(buyerStateCode)) {
-                return TaxType.INTRA_STATE;
-            }
-            return TaxType.INTER_STATE;
-        }
-
-        if (sellerStateCode != null && sellerStateCode.equalsIgnoreCase(buyerStateCode)) {
-            return TaxType.INTRA_STATE;
-        }
-
-        return TaxType.INTER_STATE;
-    }
-
     private PlanSeed resolvePlan(int index) {
         return switch (index % 4) {
             case 0 -> new PlanSeed(
@@ -991,14 +866,6 @@ public class DemoSeeder implements ApplicationRunner {
 
     private BigDecimal defaultAmount(BigDecimal value) {
         return value != null ? value : BigDecimal.ZERO;
-    }
-
-    private BigDecimal money(BigDecimal value) {
-        return (value != null ? value : BigDecimal.ZERO).setScale(2, BigDecimal.ROUND_HALF_UP);
-    }
-
-    private BigDecimal percentOf(BigDecimal base, BigDecimal rate) {
-        return money(base.multiply(rate).divide(new BigDecimal("100"), 2, BigDecimal.ROUND_HALF_UP));
     }
 
     private record PlanSeed(

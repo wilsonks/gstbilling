@@ -1,6 +1,7 @@
 package com.wilsonks.gstbilling.invoice;
 
 import com.wilsonks.gstbilling.common.TenantScopedEntity;
+import com.wilsonks.gstbilling.invoice.sequence.DocumentType;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -32,6 +33,10 @@ public class Invoice extends TenantScopedEntity {
 
     @Column(name = "company_id", nullable = false)
     private Long companyId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "document_type", nullable = false, length = 30)
+    private DocumentType documentType;
 
     @Column(name = "invoice_no", nullable = false, length = 100)
     private String invoiceNo;

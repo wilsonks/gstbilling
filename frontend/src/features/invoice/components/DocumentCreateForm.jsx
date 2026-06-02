@@ -11,7 +11,6 @@ import {
   HStack,
   IconButton,
   Input,
-  Select,
   Stack,
   Table,
   Tbody,
@@ -25,11 +24,15 @@ import {
 } from "@chakra-ui/react";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { createInvoice } from "./invoiceApi";
-import { getMyCustomers } from "../customer/customerApi";
-import { getMyProducts } from "../product/productApi";
-import CustomerSelect from "../../components/async/CustomerSelect";
-import ProductSelect from "../../components/async/ProductSelect";
+import { createInvoice } from "../invoiceApi";
+import { getMyCustomers } from "../../customer/customerApi";
+import { getMyProducts } from "../../product/productApi";
+import CustomerSelect from "../../../components/async/CustomerSelect";
+import ProductSelect from "../../../components/async/ProductSelect";
+import {
+  resolveDocumentDetailPath,
+  resolveDocumentListPath,
+} from "../documentRoutes";
 
 function formatCurrency(value) {
   const amount = Number(value || 0);
@@ -45,20 +48,6 @@ function toNumber(value, fallback = 0) {
   return Number.isFinite(num) ? num : fallback;
 }
 
-function resolveDocumentLabel(documentType) {
-  switch (documentType) {
-    case "PROFORMA_INVOICE":
-      return "Proforma Invoice";
-    case "CREDIT_NOTE":
-      return "Credit Note";
-    case "DEBIT_NOTE":
-      return "Debit Note";
-    case "TAX_INVOICE":
-    default:
-      return "Tax Invoice";
-  }
-}
-
 const initialLine = {
   productId: "",
   description: "",
@@ -66,7 +55,12 @@ const initialLine = {
   unitPrice: 0,
 };
 
-export default function InvoiceCreatePage() {
+export default function DocumentCreateForm({
+  documentType,
+  title,
+  description,
+  successTitle,
+}) {
   const navigate = useNavigate();
   const toast = useToast();
 
@@ -78,12 +72,15 @@ export default function InvoiceCreatePage() {
 
   const [form, setForm] = useState({
     customerId: "",
-    documentType: "TAX_INVOICE",
     invoiceDate: new Date().toISOString().slice(0, 10),
     notes: "",
     termsAndConditions: "Payment due within agreed credit period.",
     lines: [{ ...initialLine }],
   });
+
+  const handleBack = () => {
+    navigate(resolveDocumentListPath(documentType));
+  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -105,7 +102,7 @@ export default function InvoiceCreatePage() {
         }
       } catch (error) {
         toast({
-          title: "Failed to load document form data",
+          title: "Failed to load form data",
           description: error?.response?.data?.message || "Please try again.",
           status: "error",
           duration: 3000,
@@ -162,8 +159,6 @@ export default function InvoiceCreatePage() {
       grandTotal: taxableTotal + taxTotal,
     };
   }, [computedLines]);
-
-  const documentLabel = resolveDocumentLabel(form.documentType);
 
   const handleHeaderChange = (field, value) => {
     setForm((prev) => ({
@@ -229,7 +224,7 @@ export default function InvoiceCreatePage() {
 
     if (!form.invoiceDate) {
       toast({
-        title: "Document date is required",
+        title: "Date is required",
         status: "warning",
         duration: 2500,
         isClosable: true,
@@ -291,7 +286,7 @@ export default function InvoiceCreatePage() {
     try {
       const payload = {
         customerId: Number(form.customerId),
-        documentType: form.documentType,
+        documentType,
         invoiceDate: form.invoiceDate,
         notes: form.notes?.trim() || null,
         termsAndConditions: form.termsAndConditions?.trim() || null,
@@ -306,17 +301,17 @@ export default function InvoiceCreatePage() {
       const created = await createInvoice(payload);
 
       toast({
-        title: `${documentLabel} created`,
+        title: successTitle,
         description: `${created.invoiceNo} created successfully.`,
         status: "success",
         duration: 3000,
         isClosable: true,
       });
 
-      navigate("/invoices");
+      navigate(resolveDocumentDetailPath(created));
     } catch (error) {
       toast({
-        title: `Failed to create ${documentLabel.toLowerCase()}`,
+        title: "Failed to create document",
         description: error?.response?.data?.message || "Please try again.",
         status: "error",
         duration: 3500,
@@ -336,43 +331,29 @@ export default function InvoiceCreatePage() {
               size="sm"
               variant="outline"
               leftIcon={<ArrowLeft size={14} />}
-              onClick={() => navigate("/invoices")}
+              onClick={handleBack}
             >
               Back
             </Button>
           </HStack>
 
-          <Heading size="lg">Create {documentLabel}</Heading>
+          <Heading size="lg">{title}</Heading>
           <Text color="gray.500" mt={1}>
-            Create a billing document with product lines, pricing, and GST preview.
+            {description}
           </Text>
         </Box>
 
         <Button colorScheme="blue" onClick={handleSubmit} isLoading={saving}>
-          Create {documentLabel}
+          Create
         </Button>
       </Flex>
 
       <Card borderWidth="1px" borderColor="gray.200" shadow="sm" borderRadius="xl">
         <CardBody>
           <Stack spacing={5}>
-            <Heading size="md">Document Header</Heading>
+            <Heading size="md">Header</Heading>
 
-            <Grid templateColumns={{ base: "1fr", md: "1fr 1fr 1fr" }} gap={4}>
-              <Box>
-                <Text fontSize="sm" color="gray.600" mb={2}>
-                  Document Type
-                </Text>
-                <Select
-                  value={form.documentType}
-                  onChange={(e) => handleHeaderChange("documentType", e.target.value)}
-                  isDisabled={loading || saving}
-                >
-                  <option value="TAX_INVOICE">Tax Invoice</option>
-                  <option value="PROFORMA_INVOICE">Proforma Invoice</option>
-                </Select>
-              </Box>
-
+            <Grid templateColumns={{ base: "1fr", md: "1fr 1fr" }} gap={4}>
               <Box>
                 <Text fontSize="sm" color="gray.600" mb={2}>
                   Customer
@@ -386,7 +367,7 @@ export default function InvoiceCreatePage() {
 
               <Box>
                 <Text fontSize="sm" color="gray.600" mb={2}>
-                  Document Date
+                  Date
                 </Text>
                 <Input
                   type="date"

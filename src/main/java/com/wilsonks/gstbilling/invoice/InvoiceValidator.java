@@ -1,5 +1,6 @@
 package com.wilsonks.gstbilling.invoice;
 
+import com.wilsonks.gstbilling.invoice.sequence.DocumentType;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -10,6 +11,14 @@ public class InvoiceValidator {
     public void validateForCreate(CreateInvoiceRequest request) {
         if (request == null) {
             throw new IllegalArgumentException("Invoice payload is required");
+        }
+
+        DocumentType documentType = request.getDocumentType() != null
+                ? request.getDocumentType()
+                : DocumentType.TAX_INVOICE;
+
+        if (documentType == DocumentType.CREDIT_NOTE || documentType == DocumentType.DEBIT_NOTE) {
+            throw new IllegalArgumentException("Credit note and debit note are not supported yet");
         }
 
         if (request.getCustomerId() == null) {

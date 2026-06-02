@@ -30,9 +30,14 @@ import TenantUserAccessPage from "../features/user-access/TenantUserAccessPage";
 import ProductPage from "../features/product/ProductPage";
 import CustomerPage from "../features/customer/CustomerPage";
 import InvoiceSequencePage from "../features/invoice-sequence/InvoiceSequencePage";
+
 import InvoicePage from "../features/invoice/InvoicePage";
-import InvoiceCreatePage from "../features/invoice/InvoiceCreatePage";
+import TaxInvoiceCreatePage from "../features/invoice/TaxInvoiceCreatePage";
 import InvoiceDetailsPage from "../features/invoice/InvoiceDetailsPage";
+
+import ProformaInvoicePage from "../features/invoice/ProformaInvoicePage";
+import ProformaInvoiceCreatePage from "../features/invoice/ProformaInvoiceCreatePage";
+import ProformaInvoiceDetailsPage from "../features/invoice/ProformaInvoiceDetailsPage";
 
 /* =========================================================
  * Admin Pages
@@ -149,6 +154,7 @@ export default function AppRouter() {
         }
       />
 
+      {/* Tax Invoices */}
       <Route
         path="/invoices"
         element={
@@ -165,7 +171,7 @@ export default function AppRouter() {
         element={
           <ProtectedRoute>
             <AppLayout>
-              <InvoiceCreatePage />
+              <TaxInvoiceCreatePage />
             </AppLayout>
           </ProtectedRoute>
         }
@@ -182,6 +188,41 @@ export default function AppRouter() {
         }
       />
 
+      {/* Proforma Invoices */}
+      <Route
+        path="/proforma-invoices"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <ProformaInvoicePage />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/proforma-invoices/new"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <ProformaInvoiceCreatePage />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/proforma-invoices/:id"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <ProformaInvoiceDetailsPage />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Legacy redirects */}
       <Route path="/invoice" element={<Navigate to="/invoices" replace />} />
       <Route path="/invoice/new" element={<Navigate to="/invoices/new" replace />} />
       <Route path="/parties" element={<Navigate to="/customers" replace />} />

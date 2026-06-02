@@ -46,8 +46,24 @@ public class InvoiceService {
     public InvoiceDto create(CreateInvoiceRequest request) {
         Long tenantId = getTenantIdOrThrow();
         Long companyId = getCompanyIdOrThrow();
+        return createInternal(tenantId, companyId, request, false);
+    }
 
+    @Transactional
+    public InvoiceDto createForSeed(Long tenantId, Long companyId, CreateInvoiceRequest request) {
+        if (tenantId == null) {
+            throw new IllegalArgumentException("Tenant id is required");
+        }
+        if (companyId == null) {
+            throw new IllegalArgumentException("Company id is required");
+        }
+        return createInternal(tenantId, companyId, request, true);
+    }
+
+    private InvoiceDto createInternal(Long tenantId, Long companyId, CreateInvoiceRequest request, boolean seedMode) {
         validator.validateForCreate(request);
+
+        DocumentType documentType = resolveDocumentType(request);
 
         Customer customer = customerRepository.findById(request.getCustomerId())
                 .orElseThrow(() -> new IllegalArgumentException("Customer not found: " + request.getCustomerId()));
@@ -64,11 +80,14 @@ public class InvoiceService {
         }
 
         TaxType taxType = resolveTaxType(company.getStateCode(), customer.getBillingStateCode(), customer.getGstin());
-        NextSequenceNumberDto nextSequence = invoiceSequenceService.nextNumber(DocumentType.TAX_INVOICE);
+        NextSequenceNumberDto nextSequence = seedMode
+                ? invoiceSequenceService.nextNumberForSeed(tenantId, companyId, documentType)
+                : invoiceSequenceService.nextNumber(documentType);
 
         Invoice invoice = new Invoice();
         invoice.setTenantId(tenantId);
         invoice.setCompanyId(companyId);
+        invoice.setDocumentType(documentType);
         invoice.setInvoiceNo(nextSequence.getFormattedNumber());
         invoice.setInvoiceDate(request.getInvoiceDate());
         invoice.setDueDate(resolveDueDate(request.getInvoiceDate(), customer.getPaymentTermsDays()));
@@ -196,6 +215,19 @@ public class InvoiceService {
 
         invoice.setStatus(InvoiceStatus.CANCELLED);
         return toDto(repo.save(invoice));
+    }
+
+    private DocumentType resolveDocumentType(CreateInvoiceRequest request) {
+        DocumentType documentType = request.getDocumentType();
+        if (documentType == null) {
+            return DocumentType.TAX_INVOICE;
+        }
+
+        if (documentType == DocumentType.CREDIT_NOTE || documentType == DocumentType.DEBIT_NOTE) {
+            throw new IllegalArgumentException("Credit note and debit note are not supported yet");
+        }
+
+        return documentType;
     }
 
     private Long getTenantIdOrThrow() {
@@ -336,6 +368,7 @@ public class InvoiceService {
         dto.setId(invoice.getId());
         dto.setTenantId(invoice.getTenantId());
         dto.setCompanyId(invoice.getCompanyId());
+        dto.setDocumentType(invoice.getDocumentType());
         dto.setInvoiceNo(invoice.getInvoiceNo());
         dto.setInvoiceDate(invoice.getInvoiceDate());
         dto.setDueDate(invoice.getDueDate());

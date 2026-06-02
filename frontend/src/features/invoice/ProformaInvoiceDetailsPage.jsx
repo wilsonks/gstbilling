@@ -1,11 +1,11 @@
 import React from "react";
 import DocumentDetailsPage from "./components/DocumentDetailsPage";
 
-export default function InvoiceDetailsPage() {
+export default function ProformaInvoiceDetailsPage() {
   return (
     <DocumentDetailsPage
-      expectedDocumentType="TAX_INVOICE"
-      title="Tax Invoice"
+      expectedDocumentType="PROFORMA_INVOICE"
+      title="Proforma Invoice"
     />
   );
 }

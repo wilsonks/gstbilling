@@ -48,12 +48,8 @@ export async function exportInvoicePdf(id) {
 }
 
 export async function previewInvoicePdf(id) {
-  const response = await api.get(`/api/invoices/${id}/export/pdf`, {
+  const response = await api.get(`/api/invoices/${id}/export/pdf?disposition=inline`, {
     responseType: "blob",
   });
   return response;
-}
-
-export function getInvoicePdfUrl(id, disposition = "attachment") {
-  return `/api/invoices/${id}/export/pdf?disposition=${disposition}`;
 }
