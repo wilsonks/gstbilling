@@ -11,7 +11,6 @@ import {
   HStack,
   IconButton,
   Input,
-  Select,
   Stack,
   Table,
   Tbody,
@@ -24,12 +23,13 @@ import {
   useToast,
 } from "@chakra-ui/react";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { createInvoice, getInvoicesPage } from "../invoiceApi";
+import { useLocation, useNavigate } from "react-router-dom";
+import { createInvoice, getInvoiceById } from "../invoiceApi";
 import { getMyCustomers } from "../../customer/customerApi";
 import { getMyProducts } from "../../product/productApi";
 import CustomerSelect from "../../../components/async/CustomerSelect";
 import ProductSelect from "../../../components/async/ProductSelect";
+import ReferenceInvoiceSelect from "../ReferenceInvoiceSelect";
 import {
   resolveDocumentDetailPath,
   resolveDocumentListPath,
@@ -63,23 +63,27 @@ export default function DocumentCreateForm({
   successTitle,
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const toast = useToast();
 
   const requiresReference =
     documentType === "CREDIT_NOTE" || documentType === "DEBIT_NOTE";
 
+  const prefilledReferenceInvoiceId = location.state?.referenceInvoiceId
+    ? String(location.state.referenceInvoiceId)
+    : "";
+
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
-  const [referenceInvoices, setReferenceInvoices] = useState([]);
-  const [referenceSearch, setReferenceSearch] = useState("");
+  const [referenceInvoice, setReferenceInvoice] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [loadingReferences, setLoadingReferences] = useState(false);
+  const [loadingReferenceInvoice, setLoadingReferenceInvoice] = useState(false);
 
   const [form, setForm] = useState({
     customerId: "",
-    referenceInvoiceId: "",
+    referenceInvoiceId: prefilledReferenceInvoiceId,
     invoiceDate: new Date().toISOString().slice(0, 10),
     notes: "",
     termsAndConditions: "Payment due within agreed credit period.",
@@ -125,57 +129,62 @@ export default function DocumentCreateForm({
   }, [toast, requiresReference]);
 
   useEffect(() => {
-    if (!requiresReference) return;
+    if (!requiresReference || !form.referenceInvoiceId) {
+      setReferenceInvoice(null);
+      return;
+    }
 
-    const loadReferences = async () => {
-      setLoadingReferences(true);
+    let ignore = false;
+
+    const loadReferenceInvoice = async () => {
+      setLoadingReferenceInvoice(true);
       try {
-        const response = await getInvoicesPage({
-          ...(referenceSearch?.trim() ? { q: referenceSearch.trim() } : {}),
-          page: 0,
-          size: 50,
-        });
+        const invoice = await getInvoiceById(form.referenceInvoiceId);
+        if (ignore) return;
 
-        const rows = response?.content || [];
-        const eligible = rows.filter(
-          (item) =>
-            item.documentType === "TAX_INVOICE" &&
-            item.status !== "CANCELLED"
-        );
+        setReferenceInvoice(invoice);
 
-        setReferenceInvoices(eligible);
+        setForm((prev) => ({
+          ...prev,
+          customerId: invoice?.customerId ? String(invoice.customerId) : "",
+          lines:
+            (invoice?.lines || []).map((line) => ({
+              productId: line.productId ? String(line.productId) : "",
+              description: line.description || "",
+              quantity: Number(line.quantity || 0),
+              unitPrice: Number(line.unitPrice || 0),
+            })) || [{ ...initialLine }],
+          notes:
+            prev.notes?.trim()
+              ? prev.notes
+              : `${
+                  documentType === "CREDIT_NOTE" ? "Credit" : "Debit"
+                } note against invoice ${invoice?.invoiceNo || ""}`.trim(),
+        }));
       } catch (error) {
-        toast({
-          title: "Failed to load reference invoices",
-          description: error?.response?.data?.message || "Please try again.",
-          status: "error",
-          duration: 3000,
-          isClosable: true,
-        });
+        if (!ignore) {
+          setReferenceInvoice(null);
+          toast({
+            title: "Failed to load reference invoice",
+            description: error?.response?.data?.message || "Please try again.",
+            status: "error",
+            duration: 3000,
+            isClosable: true,
+          });
+        }
       } finally {
-        setLoadingReferences(false);
+        if (!ignore) {
+          setLoadingReferenceInvoice(false);
+        }
       }
     };
 
-    loadReferences();
-  }, [requiresReference, referenceSearch, toast]);
+    loadReferenceInvoice();
 
-  const selectedReferenceInvoice = useMemo(() => {
-    return (
-      referenceInvoices.find(
-        (invoice) => String(invoice.id) === String(form.referenceInvoiceId)
-      ) || null
-    );
-  }, [referenceInvoices, form.referenceInvoiceId]);
-
-  useEffect(() => {
-    if (!requiresReference || !selectedReferenceInvoice) return;
-
-    setForm((prev) => ({
-      ...prev,
-      customerId: String(selectedReferenceInvoice.customerId || ""),
-    }));
-  }, [requiresReference, selectedReferenceInvoice]);
+    return () => {
+      ignore = true;
+    };
+  }, [requiresReference, form.referenceInvoiceId, documentType, toast]);
 
   const productsById = useMemo(() => {
     return new Map(products.map((product) => [String(product.id), product]));
@@ -229,12 +238,12 @@ export default function DocumentCreateForm({
   };
 
   const handleReferenceChange = (value) => {
-    const ref = referenceInvoices.find((item) => String(item.id) === String(value));
-
     setForm((prev) => ({
       ...prev,
       referenceInvoiceId: value,
-      customerId: ref?.customerId ? String(ref.customerId) : prev.customerId,
+      customerId: "",
+      lines: [{ ...initialLine }],
+      notes: "",
     }));
   };
 
@@ -283,9 +292,9 @@ export default function DocumentCreateForm({
   };
 
   const validate = () => {
-    if (!form.customerId) {
+    if (requiresReference && !form.referenceInvoiceId) {
       toast({
-        title: "Customer is required",
+        title: "Reference invoice is required",
         status: "warning",
         duration: 2500,
         isClosable: true,
@@ -293,9 +302,9 @@ export default function DocumentCreateForm({
       return false;
     }
 
-    if (requiresReference && !form.referenceInvoiceId) {
+    if (!form.customerId) {
       toast({
-        title: "Reference invoice is required",
+        title: "Customer is required",
         status: "warning",
         duration: 2500,
         isClosable: true,
@@ -441,42 +450,32 @@ export default function DocumentCreateForm({
               <Stack spacing={4}>
                 <Box>
                   <Text fontSize="sm" color="gray.600" mb={2}>
-                    Search Reference Invoice
+                    Reference Tax Invoice
                   </Text>
-                  <Input
-                    placeholder="Search tax invoice number or customer"
-                    value={referenceSearch}
-                    onChange={(e) => setReferenceSearch(e.target.value)}
-                    isDisabled={saving}
+                  <ReferenceInvoiceSelect
+                    value={form.referenceInvoiceId}
+                    onChange={handleReferenceChange}
+                    isDisabled={saving || loadingReferenceInvoice}
                   />
                 </Box>
 
-                <Box>
-                  <Text fontSize="sm" color="gray.600" mb={2}>
-                    Reference Tax Invoice
-                  </Text>
-                  <Select
-                    placeholder={loadingReferences ? "Loading..." : "Select reference invoice"}
-                    value={form.referenceInvoiceId}
-                    onChange={(e) => handleReferenceChange(e.target.value)}
-                    isDisabled={saving || loadingReferences}
-                  >
-                    {referenceInvoices.map((invoice) => (
-                      <option key={invoice.id} value={invoice.id}>
-                        {invoice.invoiceNo} — {invoice.customerLegalName}
-                      </option>
-                    ))}
-                  </Select>
-                </Box>
-
-                {selectedReferenceInvoice && (
+                {referenceInvoice && (
                   <Box borderWidth="1px" borderColor="orange.100" bg="orange.50" borderRadius="md" p={4}>
-                    <Text fontWeight="600">{selectedReferenceInvoice.invoiceNo}</Text>
+                    <Text fontWeight="600">{referenceInvoice.invoiceNo}</Text>
                     <Text fontSize="sm" color="gray.600">
-                      Customer: {selectedReferenceInvoice.customerLegalName || "—"}
+                      Customer: {referenceInvoice.customerLegalName || "—"}
                     </Text>
                     <Text fontSize="sm" color="gray.600">
-                      Amount: {formatCurrency(selectedReferenceInvoice.totalInvoiceAmount)}
+                      Date:{" "}
+                      {referenceInvoice.invoiceDate
+                        ? new Date(referenceInvoice.invoiceDate).toLocaleDateString()
+                        : "—"}
+                    </Text>
+                    <Text fontSize="sm" color="gray.600">
+                      Amount: {formatCurrency(referenceInvoice.totalInvoiceAmount)}
+                    </Text>
+                    <Text fontSize="sm" color="gray.600">
+                      Tax Type: {referenceInvoice.taxType || "—"}
                     </Text>
                   </Box>
                 )}

@@ -1,4 +1,4 @@
-package com.wilsonks.gstbilling.auth;
+package com.wilsonks.gstbilling;
 
 
 import com.wilsonks.gstbilling.exception.NotFoundException;

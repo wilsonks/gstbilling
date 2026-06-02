@@ -1,4 +1,4 @@
-package com.wilsonks.gstbilling.auth;
+package com.wilsonks.gstbilling;
 
 import com.wilsonks.gstbilling.auth.token.JwtSecurityFilter;
 import com.wilsonks.gstbilling.common.TenantAutoQuerySecurityFilter;
@@ -44,6 +44,12 @@ public class SecurityFilterChainConfig {
                                 "/invoice-sequences",
                                 "/invoices",
                                 "/invoices/**",
+                                "/proforma-invoices",
+                                "/proforma-invoices/**",
+                                "/credit-notes",
+                                "/credit-notes/**",
+                                "/debit-notes",
+                                "/debit-notes/**",
                                 "/index.html",
                                 "/static/**",
                                 "/assets/**",

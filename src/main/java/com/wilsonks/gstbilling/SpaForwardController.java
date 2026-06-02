@@ -1,4 +1,4 @@
-package com.wilsonks.gstbilling.auth;
+package com.wilsonks.gstbilling;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,6 +21,15 @@ public class SpaForwardController {
             "/invoices",
             "/invoices/new",
             "/invoices/{id}",
+            "/proforma-invoices",
+            "/proforma-invoices/new",
+            "/proforma-invoices/{id}",
+            "/credit-notes",
+            "/credit-notes/new",
+            "/credit-notes/{id}",
+            "/debit-notes",
+            "/debit-notes/new",
+            "/debit-notes/{id}",
 
             "/admin",
             "/admin/tenants",

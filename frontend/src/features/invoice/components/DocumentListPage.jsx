@@ -12,6 +12,7 @@ import {
   Input,
   InputGroup,
   InputLeftElement,
+  Link as ChakraLink,
   SimpleGrid,
   Skeleton,
   Stack,
@@ -28,8 +29,15 @@ import {
   Tr,
   useToast,
 } from "@chakra-ui/react";
-import { Download, Eye, FileText, Printer, RefreshCw, Search } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import {
+  Download,
+  Eye,
+  FileText,
+  Printer,
+  RefreshCw,
+  Search,
+} from "lucide-react";
+import { Link as RouterLink, useNavigate } from "react-router-dom";
 import {
   cancelInvoice,
   exportInvoicePdf,
@@ -41,7 +49,12 @@ import { resolveDocumentDetailPath } from "../documentRoutes";
 
 function MetricCard({ label, value, helpText, loading = false }) {
   return (
-    <Card borderWidth="1px" borderColor="gray.200" shadow="sm" borderRadius="xl">
+    <Card
+      borderWidth="1px"
+      borderColor="gray.200"
+      shadow="sm"
+      borderRadius="xl"
+    >
       <CardBody>
         <Stat>
           <StatLabel color="gray.500">{label}</StatLabel>
@@ -88,6 +101,9 @@ export default function DocumentListPage({
     totalElements: 0,
   });
 
+  const showReferenceColumn =
+    documentType === "CREDIT_NOTE" || documentType === "DEBIT_NOTE";
+
   const loadPageData = async ({ silent = false, search = query } = {}) => {
     if (silent) setRefreshing(true);
     else setLoading(true);
@@ -98,13 +114,14 @@ export default function DocumentListPage({
           ...(search?.trim() ? { q: search.trim() } : {}),
           page: 0,
           size: 50,
+          sort: "updatedAt,desc",
         }),
         getInvoiceStats(),
       ]);
 
       const allRows = invoicePage?.content || [];
       const filteredByType = allRows.filter(
-        (item) => (item.documentType || "TAX_INVOICE") === documentType
+        (item) => (item.documentType || "TAX_INVOICE") === documentType,
       );
 
       setRows(filteredByType);
@@ -139,16 +156,19 @@ export default function DocumentListPage({
 
   const issuedCount = useMemo(
     () => rows.filter((item) => item.status === "ISSUED").length,
-    [rows]
+    [rows],
   );
 
   const cancelledCount = useMemo(
     () => rows.filter((item) => item.status === "CANCELLED").length,
-    [rows]
+    [rows],
   );
 
   const totalValue = useMemo(() => {
-    return rows.reduce((sum, item) => sum + Number(item.totalInvoiceAmount || 0), 0);
+    return rows.reduce(
+      (sum, item) => sum + Number(item.totalInvoiceAmount || 0),
+      0,
+    );
   }, [rows]);
 
   const handleSearch = async () => {
@@ -294,7 +314,12 @@ export default function DocumentListPage({
         />
       </SimpleGrid>
 
-      <Card borderWidth="1px" borderColor="gray.200" shadow="sm" borderRadius="xl">
+      <Card
+        borderWidth="1px"
+        borderColor="gray.200"
+        shadow="sm"
+        borderRadius="xl"
+      >
         <CardBody>
           <Stack spacing={4}>
             <Flex gap={3} direction={{ base: "column", md: "row" }}>
@@ -345,6 +370,7 @@ export default function DocumentListPage({
                     <Tr>
                       <Th>No</Th>
                       <Th>Date</Th>
+                      {showReferenceColumn && <Th>Reference Invoice</Th>}
                       <Th>Customer</Th>
                       <Th>Tax Type</Th>
                       <Th isNumeric>Grand Total</Th>
@@ -361,17 +387,36 @@ export default function DocumentListPage({
                             ? new Date(invoice.invoiceDate).toLocaleDateString()
                             : "—"}
                         </Td>
+                        {showReferenceColumn && (
+                          <Td>
+                            {invoice.referenceInvoiceId ? (
+                              <ChakraLink
+                                as={RouterLink}
+                                to={`/invoices/${invoice.referenceInvoiceId}`}
+                                color="blue.600"
+                                fontWeight="600"
+                              >
+                                {invoice.referenceInvoiceNo ||
+                                  `Invoice #${invoice.referenceInvoiceId}`}
+                              </ChakraLink>
+                            ) : (
+                              "—"
+                            )}
+                          </Td>
+                        )}
                         <Td>{invoice.customerLegalName || "—"}</Td>
                         <Td>{invoice.taxType?.replaceAll("_", " ") || "—"}</Td>
-                        <Td isNumeric>{formatCurrency(invoice.totalInvoiceAmount)}</Td>
+                        <Td isNumeric>
+                          {formatCurrency(invoice.totalInvoiceAmount)}
+                        </Td>
                         <Td>
                           <Badge
                             colorScheme={
                               invoice.status === "CANCELLED"
                                 ? "red"
                                 : invoice.status === "ISSUED"
-                                ? "green"
-                                : "gray"
+                                  ? "green"
+                                  : "gray"
                             }
                           >
                             {invoice.status || "—"}
@@ -422,7 +467,8 @@ export default function DocumentListPage({
 
             {!loading && filteredRows.length > 0 && (
               <Text fontSize="sm" color="gray.500">
-                Showing {filteredRows.length} of {pageInfo.totalElements} document(s)
+                Showing {filteredRows.length} of {pageInfo.totalElements}{" "}
+                document(s)
               </Text>
             )}
           </Stack>

@@ -11,6 +11,7 @@ import {
   GridItem,
   Heading,
   HStack,
+  Link as ChakraLink,
   Spinner,
   Stack,
   Table,
@@ -23,7 +24,12 @@ import {
   useToast,
 } from "@chakra-ui/react";
 import { ArrowLeft, Download, Printer } from "lucide-react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import {
+  Link as RouterLink,
+  useLocation,
+  useNavigate,
+  useParams,
+} from "react-router-dom";
 import {
   cancelInvoice,
   exportInvoicePdf,
@@ -79,6 +85,10 @@ function resolveDetailPath(documentType, id) {
   switch (documentType) {
     case "PROFORMA_INVOICE":
       return `/proforma-invoices/${id}`;
+    case "CREDIT_NOTE":
+      return `/credit-notes/${id}`;
+    case "DEBIT_NOTE":
+      return `/debit-notes/${id}`;
     case "TAX_INVOICE":
     default:
       return `/invoices/${id}`;
@@ -152,7 +162,11 @@ export default function DocumentDetailsPage({ expectedDocumentType, title }) {
         isClosable: true,
       });
 
-      navigate(resolveDocumentListPath(updated.documentType || invoice.documentType || "TAX_INVOICE"));
+      navigate(
+        resolveDocumentListPath(
+          updated.documentType || invoice.documentType || "TAX_INVOICE",
+        ),
+      );
     } catch (error) {
       toast({
         title: "Failed to cancel document",
@@ -164,6 +178,24 @@ export default function DocumentDetailsPage({ expectedDocumentType, title }) {
     } finally {
       setCancelling(false);
     }
+  };
+
+  const handleCreateCreditNote = () => {
+    if (!invoice?.id) return;
+    navigate("/credit-notes/new", {
+      state: {
+        referenceInvoiceId: invoice.id,
+      },
+    });
+  };
+
+  const handleCreateDebitNote = () => {
+    if (!invoice?.id) return;
+    navigate("/debit-notes/new", {
+      state: {
+        referenceInvoiceId: invoice.id,
+      },
+    });
   };
 
   useEffect(() => {
@@ -212,6 +244,12 @@ export default function DocumentDetailsPage({ expectedDocumentType, title }) {
   }, [invoice, location.search]);
 
   const lines = useMemo(() => invoice?.lines || [], [invoice]);
+  const isNote =
+    invoice?.documentType === "CREDIT_NOTE" ||
+    invoice?.documentType === "DEBIT_NOTE";
+  const isTaxInvoice = invoice?.documentType === "TAX_INVOICE";
+  const canCreateNotes =
+    invoice?.documentType === "TAX_INVOICE" && invoice?.status !== "CANCELLED";
 
   const handleDownloadPdf = async () => {
     if (!invoice?.id) return;
@@ -284,6 +322,25 @@ export default function DocumentDetailsPage({ expectedDocumentType, title }) {
         </Box>
 
         <HStack spacing={3} flexWrap="wrap">
+          {canCreateNotes && (
+            <>
+              <Button
+                variant="outline"
+                colorScheme="teal"
+                onClick={handleCreateCreditNote}
+              >
+                Create Credit Note
+              </Button>
+              <Button
+                variant="outline"
+                colorScheme="orange"
+                onClick={handleCreateDebitNote}
+              >
+                Create Debit Note
+              </Button>
+            </>
+          )}
+
           <Button
             variant="outline"
             leftIcon={<Printer size={16} />}
@@ -313,10 +370,20 @@ export default function DocumentDetailsPage({ expectedDocumentType, title }) {
         </HStack>
       </Flex>
 
-      <Card borderWidth="1px" borderColor="gray.200" shadow="sm" borderRadius="xl">
+      <Card
+        borderWidth="1px"
+        borderColor="gray.200"
+        shadow="sm"
+        borderRadius="xl"
+      >
         <CardBody>
           <Stack spacing={6}>
-            <Flex justify="space-between" align="flex-start" wrap="wrap" gap={4}>
+            <Flex
+              justify="space-between"
+              align="flex-start"
+              wrap="wrap"
+              gap={4}
+            >
               <Box>
                 <Text
                   fontSize="xs"
@@ -339,26 +406,51 @@ export default function DocumentDetailsPage({ expectedDocumentType, title }) {
                   invoice.status === "CANCELLED"
                     ? "red"
                     : invoice.status === "ISSUED"
-                    ? "green"
-                    : "gray"
+                      ? "green"
+                      : "gray"
                 }
               >
                 {invoice.status || "—"}
               </Badge>
             </Flex>
 
+            {isNote && invoice.referenceInvoiceId && (
+              <Card variant="outline">
+                <CardBody>
+                  <Stack spacing={2}>
+                    <Heading size="sm">Reference Tax Invoice</Heading>
+                    <ChakraLink
+                      as={RouterLink}
+                      to={`/invoices/${invoice.referenceInvoiceId}`}
+                      color="blue.600"
+                      fontWeight="600"
+                    >
+                      {invoice.referenceInvoiceNo ||
+                        `Invoice #${invoice.referenceInvoiceId}`}
+                    </ChakraLink>
+                  </Stack>
+                </CardBody>
+              </Card>
+            )}
+
             <Grid templateColumns={{ base: "1fr", lg: "1fr 1fr" }} gap={6}>
               <GridItem>
                 <PrintSection title="Seller">
                   <Text fontWeight="700">{invoice.sellerLegalName || "—"}</Text>
-                  <Text color="gray.600">GSTIN: {invoice.sellerGstin || "—"}</Text>
+                  <Text color="gray.600">
+                    GSTIN: {invoice.sellerGstin || "—"}
+                  </Text>
                 </PrintSection>
               </GridItem>
 
               <GridItem>
                 <PrintSection title="Customer">
-                  <Text fontWeight="700">{invoice.customerLegalName || "—"}</Text>
-                  <Text color="gray.600">GSTIN: {invoice.customerGstin || "—"}</Text>
+                  <Text fontWeight="700">
+                    {invoice.customerLegalName || "—"}
+                  </Text>
+                  <Text color="gray.600">
+                    GSTIN: {invoice.customerGstin || "—"}
+                  </Text>
                 </PrintSection>
               </GridItem>
             </Grid>
@@ -372,7 +464,9 @@ export default function DocumentDetailsPage({ expectedDocumentType, title }) {
                   </Flex>
                   <Flex justify="space-between">
                     <Text color="gray.500">Date</Text>
-                    <Text fontWeight="600">{formatDate(invoice.invoiceDate)}</Text>
+                    <Text fontWeight="600">
+                      {formatDate(invoice.invoiceDate)}
+                    </Text>
                   </Flex>
                   <Flex justify="space-between">
                     <Text color="gray.500">Due Date</Text>
@@ -389,11 +483,15 @@ export default function DocumentDetailsPage({ expectedDocumentType, title }) {
                 <PrintSection title="Amount Summary">
                   <Flex justify="space-between">
                     <Text color="gray.500">Taxable Amount</Text>
-                    <Text fontWeight="600">{formatCurrency(invoice.totalTaxableAmount)}</Text>
+                    <Text fontWeight="600">
+                      {formatCurrency(invoice.totalTaxableAmount)}
+                    </Text>
                   </Flex>
                   <Flex justify="space-between">
                     <Text color="gray.500">Total Tax</Text>
-                    <Text fontWeight="600">{formatCurrency(invoice.totalTaxAmount)}</Text>
+                    <Text fontWeight="600">
+                      {formatCurrency(invoice.totalTaxAmount)}
+                    </Text>
                   </Flex>
                   <Flex justify="space-between">
                     <Text color="gray.500">Grand Total</Text>
@@ -432,10 +530,14 @@ export default function DocumentDetailsPage({ expectedDocumentType, title }) {
                             <Td>{line.description || "—"}</Td>
                             <Td>{formatNumber(line.quantity, 3)}</Td>
                             <Td isNumeric>{formatCurrency(line.unitPrice)}</Td>
-                            <Td isNumeric>{formatCurrency(line.taxableAmount)}</Td>
+                            <Td isNumeric>
+                              {formatCurrency(line.taxableAmount)}
+                            </Td>
                             <Td isNumeric>{formatNumber(line.gstRate, 2)}%</Td>
                             <Td isNumeric>{formatCurrency(taxAmount(line))}</Td>
-                            <Td isNumeric>{formatCurrency(line.lineTotalAmount)}</Td>
+                            <Td isNumeric>
+                              {formatCurrency(line.lineTotalAmount)}
+                            </Td>
                           </Tr>
                         ))}
                       </Tbody>

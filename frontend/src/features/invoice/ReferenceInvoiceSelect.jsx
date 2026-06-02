@@ -1,11 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Select, Spinner, Text, VStack } from "@chakra-ui/react";
-import { getInvoicesPage } from "../invoiceApi";
+import { getInvoicesPage } from "./invoiceApi";
 
 export default function ReferenceInvoiceSelect({
   value,
   onChange,
-  customerId,
   isDisabled,
 }) {
   const [loading, setLoading] = useState(false);
@@ -33,10 +32,6 @@ export default function ReferenceInvoiceSelect({
             return false;
           }
 
-          if (customerId && String(invoice.customerId) !== String(customerId)) {
-            return false;
-          }
-
           return true;
         });
 
@@ -57,7 +52,7 @@ export default function ReferenceInvoiceSelect({
     return () => {
       ignore = true;
     };
-  }, [customerId]);
+  }, []);
 
   const options = useMemo(() => invoices || [], [invoices]);
 
@@ -67,14 +62,10 @@ export default function ReferenceInvoiceSelect({
         <Spinner size="sm" />
       ) : (
         <Select
-          placeholder={
-            customerId
-              ? "Select reference invoice"
-              : "Select customer first"
-          }
+          placeholder="Select reference invoice"
           value={value || ""}
           onChange={(e) => onChange?.(e.target.value)}
-          isDisabled={isDisabled || loading || !customerId}
+          isDisabled={isDisabled || loading}
         >
           {options.map((invoice) => (
             <option key={invoice.id} value={invoice.id}>
@@ -87,9 +78,9 @@ export default function ReferenceInvoiceSelect({
         </Select>
       )}
 
-      {!loading && customerId && options.length === 0 && (
+      {!loading && options.length === 0 && (
         <Text fontSize="sm" color="gray.500">
-          No eligible tax invoices found for this customer.
+          No eligible tax invoices found.
         </Text>
       )}
     </VStack>
