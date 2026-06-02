@@ -79,7 +79,18 @@ public class InvoiceService {
             throw new IllegalArgumentException("Company does not belong to current tenant");
         }
 
-        TaxType taxType = resolveTaxType(company.getStateCode(), customer.getBillingStateCode(), customer.getGstin());
+        Invoice referenceInvoice = resolveAndValidateReferenceInvoice(
+                tenantId,
+                companyId,
+                customer.getId(),
+                documentType,
+                request.getReferenceInvoiceId()
+        );
+
+        TaxType taxType = referenceInvoice != null
+                ? referenceInvoice.getTaxType()
+                : resolveTaxType(company.getStateCode(), customer.getBillingStateCode(), customer.getGstin());
+
         NextSequenceNumberDto nextSequence = seedMode
                 ? invoiceSequenceService.nextNumberForSeed(tenantId, companyId, documentType)
                 : invoiceSequenceService.nextNumber(documentType);
@@ -88,6 +99,8 @@ public class InvoiceService {
         invoice.setTenantId(tenantId);
         invoice.setCompanyId(companyId);
         invoice.setDocumentType(documentType);
+        invoice.setReferenceInvoiceId(referenceInvoice != null ? referenceInvoice.getId() : null);
+        invoice.setReferenceInvoiceNo(referenceInvoice != null ? referenceInvoice.getInvoiceNo() : null);
         invoice.setInvoiceNo(nextSequence.getFormattedNumber());
         invoice.setInvoiceDate(request.getInvoiceDate());
         invoice.setDueDate(resolveDueDate(request.getInvoiceDate(), customer.getPaymentTermsDays()));
@@ -223,11 +236,39 @@ public class InvoiceService {
             return DocumentType.TAX_INVOICE;
         }
 
-        if (documentType == DocumentType.CREDIT_NOTE || documentType == DocumentType.DEBIT_NOTE) {
-            throw new IllegalArgumentException("Credit note and debit note are not supported yet");
+        return documentType;
+    }
+
+    private Invoice resolveAndValidateReferenceInvoice(
+            Long tenantId,
+            Long companyId,
+            Long customerId,
+            DocumentType documentType,
+            Long referenceInvoiceId
+    ) {
+        boolean requiresReference =
+                documentType == DocumentType.CREDIT_NOTE || documentType == DocumentType.DEBIT_NOTE;
+
+        if (!requiresReference) {
+            return null;
         }
 
-        return documentType;
+        Invoice referenceInvoice = repo.findByIdAndTenantIdAndCompanyId(referenceInvoiceId, tenantId, companyId)
+                .orElseThrow(() -> new IllegalArgumentException("Reference invoice not found: " + referenceInvoiceId));
+
+        if (referenceInvoice.getDocumentType() != DocumentType.TAX_INVOICE) {
+            throw new IllegalArgumentException("Reference invoice must be a tax invoice");
+        }
+
+        if (referenceInvoice.getStatus() == InvoiceStatus.CANCELLED) {
+            throw new IllegalArgumentException("Reference invoice cannot be cancelled");
+        }
+
+        if (!customerId.equals(referenceInvoice.getCustomerId())) {
+            throw new IllegalArgumentException("Reference invoice customer must match selected customer");
+        }
+
+        return referenceInvoice;
     }
 
     private Long getTenantIdOrThrow() {
@@ -369,6 +410,8 @@ public class InvoiceService {
         dto.setTenantId(invoice.getTenantId());
         dto.setCompanyId(invoice.getCompanyId());
         dto.setDocumentType(invoice.getDocumentType());
+        dto.setReferenceInvoiceId(invoice.getReferenceInvoiceId());
+        dto.setReferenceInvoiceNo(invoice.getReferenceInvoiceNo());
         dto.setInvoiceNo(invoice.getInvoiceNo());
         dto.setInvoiceDate(invoice.getInvoiceDate());
         dto.setDueDate(invoice.getDueDate());

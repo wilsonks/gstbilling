@@ -4,20 +4,21 @@ import { useNavigate, useLocation } from "react-router-dom";
 import {
   Home,
   FileText,
+  ReceiptText,
   Package,
   Users,
   LayoutDashboard,
   Building2,
   UserCog,
-  ReceiptText,
+  BadgeIndianRupee,
 } from "lucide-react";
 
 const tenantItems = [
   { label: "Home", path: "/dashboard", icon: Home },
   { label: "Invoices", path: "/invoices", icon: FileText },
   { label: "Proforma", path: "/proforma-invoices", icon: ReceiptText },
-  { label: "Products", path: "/products", icon: Package },
-  { label: "Customers", path: "/customers", icon: Users },
+  { label: "Credit", path: "/credit-notes", icon: BadgeIndianRupee },
+  { label: "Debit", path: "/debit-notes", icon: BadgeIndianRupee },
 ];
 
 const adminItems = [
@@ -29,6 +30,8 @@ const adminItems = [
 const hiddenRoutes = [
   "/invoices/new",
   "/proforma-invoices/new",
+  "/credit-notes/new",
+  "/debit-notes/new",
 ];
 
 export default function BottomNav({ type = "tenant" }) {

@@ -38,6 +38,12 @@ public class Invoice extends TenantScopedEntity {
     @Column(name = "document_type", nullable = false, length = 30)
     private DocumentType documentType;
 
+    @Column(name = "reference_invoice_id")
+    private Long referenceInvoiceId;
+
+    @Column(name = "reference_invoice_no", length = 100)
+    private String referenceInvoiceNo;
+
     @Column(name = "invoice_no", nullable = false, length = 100)
     private String invoiceNo;
 

@@ -93,3 +93,16 @@ INVOICES_PER_COMPANY proforma invoices
 
 sequence current number is updated per document type
 invoice entity gets documentType
+
+generate the backend changes for:
+
+Invoice.java
+CreateInvoiceRequest.java
+InvoiceDto.java
+InvoiceValidator.java
+InvoiceService.java
+so that:
+
+CREDIT_NOTE and DEBIT_NOTE are both supported
+both require referenceInvoiceId
+both validate against an existing tax invoice

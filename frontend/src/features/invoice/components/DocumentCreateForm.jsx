@@ -11,6 +11,7 @@ import {
   HStack,
   IconButton,
   Input,
+  Select,
   Stack,
   Table,
   Tbody,
@@ -24,7 +25,7 @@ import {
 } from "@chakra-ui/react";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { createInvoice } from "../invoiceApi";
+import { createInvoice, getInvoicesPage } from "../invoiceApi";
 import { getMyCustomers } from "../../customer/customerApi";
 import { getMyProducts } from "../../product/productApi";
 import CustomerSelect from "../../../components/async/CustomerSelect";
@@ -64,14 +65,21 @@ export default function DocumentCreateForm({
   const navigate = useNavigate();
   const toast = useToast();
 
+  const requiresReference =
+    documentType === "CREDIT_NOTE" || documentType === "DEBIT_NOTE";
+
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
+  const [referenceInvoices, setReferenceInvoices] = useState([]);
+  const [referenceSearch, setReferenceSearch] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [loadingReferences, setLoadingReferences] = useState(false);
 
   const [form, setForm] = useState({
     customerId: "",
+    referenceInvoiceId: "",
     invoiceDate: new Date().toISOString().slice(0, 10),
     notes: "",
     termsAndConditions: "Payment due within agreed credit period.",
@@ -94,7 +102,7 @@ export default function DocumentCreateForm({
         setCustomers(customerData || []);
         setProducts(productData || []);
 
-        if ((customerData || []).length > 0) {
+        if (!requiresReference && (customerData || []).length > 0) {
           setForm((prev) => ({
             ...prev,
             customerId: prev.customerId || String(customerData[0].id),
@@ -114,7 +122,60 @@ export default function DocumentCreateForm({
     };
 
     loadData();
-  }, [toast]);
+  }, [toast, requiresReference]);
+
+  useEffect(() => {
+    if (!requiresReference) return;
+
+    const loadReferences = async () => {
+      setLoadingReferences(true);
+      try {
+        const response = await getInvoicesPage({
+          ...(referenceSearch?.trim() ? { q: referenceSearch.trim() } : {}),
+          page: 0,
+          size: 50,
+        });
+
+        const rows = response?.content || [];
+        const eligible = rows.filter(
+          (item) =>
+            item.documentType === "TAX_INVOICE" &&
+            item.status !== "CANCELLED"
+        );
+
+        setReferenceInvoices(eligible);
+      } catch (error) {
+        toast({
+          title: "Failed to load reference invoices",
+          description: error?.response?.data?.message || "Please try again.",
+          status: "error",
+          duration: 3000,
+          isClosable: true,
+        });
+      } finally {
+        setLoadingReferences(false);
+      }
+    };
+
+    loadReferences();
+  }, [requiresReference, referenceSearch, toast]);
+
+  const selectedReferenceInvoice = useMemo(() => {
+    return (
+      referenceInvoices.find(
+        (invoice) => String(invoice.id) === String(form.referenceInvoiceId)
+      ) || null
+    );
+  }, [referenceInvoices, form.referenceInvoiceId]);
+
+  useEffect(() => {
+    if (!requiresReference || !selectedReferenceInvoice) return;
+
+    setForm((prev) => ({
+      ...prev,
+      customerId: String(selectedReferenceInvoice.customerId || ""),
+    }));
+  }, [requiresReference, selectedReferenceInvoice]);
 
   const productsById = useMemo(() => {
     return new Map(products.map((product) => [String(product.id), product]));
@@ -167,6 +228,16 @@ export default function DocumentCreateForm({
     }));
   };
 
+  const handleReferenceChange = (value) => {
+    const ref = referenceInvoices.find((item) => String(item.id) === String(value));
+
+    setForm((prev) => ({
+      ...prev,
+      referenceInvoiceId: value,
+      customerId: ref?.customerId ? String(ref.customerId) : prev.customerId,
+    }));
+  };
+
   const handleLineChange = (index, field, value) => {
     setForm((prev) => {
       const nextLines = [...prev.lines];
@@ -215,6 +286,16 @@ export default function DocumentCreateForm({
     if (!form.customerId) {
       toast({
         title: "Customer is required",
+        status: "warning",
+        duration: 2500,
+        isClosable: true,
+      });
+      return false;
+    }
+
+    if (requiresReference && !form.referenceInvoiceId) {
+      toast({
+        title: "Reference invoice is required",
         status: "warning",
         duration: 2500,
         isClosable: true,
@@ -287,6 +368,9 @@ export default function DocumentCreateForm({
       const payload = {
         customerId: Number(form.customerId),
         documentType,
+        referenceInvoiceId: requiresReference
+          ? Number(form.referenceInvoiceId)
+          : null,
         invoiceDate: form.invoiceDate,
         notes: form.notes?.trim() || null,
         termsAndConditions: form.termsAndConditions?.trim() || null,
@@ -353,6 +437,52 @@ export default function DocumentCreateForm({
           <Stack spacing={5}>
             <Heading size="md">Header</Heading>
 
+            {requiresReference && (
+              <Stack spacing={4}>
+                <Box>
+                  <Text fontSize="sm" color="gray.600" mb={2}>
+                    Search Reference Invoice
+                  </Text>
+                  <Input
+                    placeholder="Search tax invoice number or customer"
+                    value={referenceSearch}
+                    onChange={(e) => setReferenceSearch(e.target.value)}
+                    isDisabled={saving}
+                  />
+                </Box>
+
+                <Box>
+                  <Text fontSize="sm" color="gray.600" mb={2}>
+                    Reference Tax Invoice
+                  </Text>
+                  <Select
+                    placeholder={loadingReferences ? "Loading..." : "Select reference invoice"}
+                    value={form.referenceInvoiceId}
+                    onChange={(e) => handleReferenceChange(e.target.value)}
+                    isDisabled={saving || loadingReferences}
+                  >
+                    {referenceInvoices.map((invoice) => (
+                      <option key={invoice.id} value={invoice.id}>
+                        {invoice.invoiceNo} — {invoice.customerLegalName}
+                      </option>
+                    ))}
+                  </Select>
+                </Box>
+
+                {selectedReferenceInvoice && (
+                  <Box borderWidth="1px" borderColor="orange.100" bg="orange.50" borderRadius="md" p={4}>
+                    <Text fontWeight="600">{selectedReferenceInvoice.invoiceNo}</Text>
+                    <Text fontSize="sm" color="gray.600">
+                      Customer: {selectedReferenceInvoice.customerLegalName || "—"}
+                    </Text>
+                    <Text fontSize="sm" color="gray.600">
+                      Amount: {formatCurrency(selectedReferenceInvoice.totalInvoiceAmount)}
+                    </Text>
+                  </Box>
+                )}
+              </Stack>
+            )}
+
             <Grid templateColumns={{ base: "1fr", md: "1fr 1fr" }} gap={4}>
               <Box>
                 <Text fontSize="sm" color="gray.600" mb={2}>
@@ -361,7 +491,7 @@ export default function DocumentCreateForm({
                 <CustomerSelect
                   value={form.customerId}
                   onChange={(value) => handleHeaderChange("customerId", value)}
-                  isDisabled={loading || saving}
+                  isDisabled={loading || saving || requiresReference}
                 />
               </Box>
 

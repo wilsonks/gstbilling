@@ -15,6 +15,8 @@ public class InvoiceDto {
     private Long companyId;
 
     private DocumentType documentType;
+    private Long referenceInvoiceId;
+    private String referenceInvoiceNo;
     private String invoiceNo;
     private LocalDate invoiceDate;
     private LocalDate dueDate;

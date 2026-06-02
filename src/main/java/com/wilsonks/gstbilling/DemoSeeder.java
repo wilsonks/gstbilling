@@ -15,7 +15,7 @@ import com.wilsonks.gstbilling.customer.CustomerType;
 import com.wilsonks.gstbilling.customer.GstRegistrationType;
 import com.wilsonks.gstbilling.invoice.CreateInvoiceLineRequest;
 import com.wilsonks.gstbilling.invoice.CreateInvoiceRequest;
-import com.wilsonks.gstbilling.invoice.InvoiceRepository;
+import com.wilsonks.gstbilling.invoice.InvoiceDto;
 import com.wilsonks.gstbilling.invoice.InvoiceService;
 import com.wilsonks.gstbilling.invoice.sequence.DocumentType;
 import com.wilsonks.gstbilling.invoice.sequence.FinancialYearUtil;
@@ -62,7 +62,6 @@ public class DemoSeeder implements ApplicationRunner {
 
     private static final int TENANT_COUNT = 5;
     private static final int TOTAL_COMPANIES = 20;
-    private static final int PRODUCTS_PER_TENANT = 10;
     private static final int CUSTOMERS_PER_TENANT = 10;
     private static final int INVOICES_PER_COMPANY = 5;
 
@@ -83,7 +82,6 @@ public class DemoSeeder implements ApplicationRunner {
 
     private final CustomerRepository customerRepository;
     private final InvoiceSequenceRepository invoiceSequenceRepository;
-    private final InvoiceRepository invoiceRepository;
     private final InvoiceService invoiceService;
 
     @Override
@@ -147,8 +145,7 @@ public class DemoSeeder implements ApplicationRunner {
                         tenant,
                         company,
                         customers,
-                        globalCompanyIndex,
-                        financialYear
+                        globalCompanyIndex
                 );
             }
         }
@@ -489,6 +486,22 @@ public class DemoSeeder implements ApplicationRunner {
                 DocumentType.PROFORMA_INVOICE,
                 "PI/" + financialYear + "/"
         );
+
+        upsertInvoiceSequenceForDocumentType(
+                tenantId,
+                companyId,
+                financialYear,
+                DocumentType.CREDIT_NOTE,
+                "CN/" + financialYear + "/"
+        );
+
+        upsertInvoiceSequenceForDocumentType(
+                tenantId,
+                companyId,
+                financialYear,
+                DocumentType.DEBIT_NOTE,
+                "DN/" + financialYear + "/"
+        );
     }
 
     private void upsertInvoiceSequenceForDocumentType(
@@ -528,16 +541,32 @@ public class DemoSeeder implements ApplicationRunner {
             Tenant tenant,
             Company company,
             List<Customer> customers,
-            int globalCompanyIndex,
-            String financialYear
+            int globalCompanyIndex
     ) {
         List<Product> products = productRepository.findByTenantId(tenant.getTenantId());
         if (products.size() < 2) {
             return;
         }
 
+        List<InvoiceDto> seededTaxInvoices = new ArrayList<>();
+
         for (int invoiceOffset = 1; invoiceOffset <= INVOICES_PER_COMPANY; invoiceOffset++) {
             Customer customer = customers.get((invoiceOffset - 1) % customers.size());
+
+            InvoiceDto taxInvoice = seedSingleInvoice(
+                    tenant.getTenantId(),
+                    company,
+                    customer,
+                    products,
+                    invoiceOffset,
+                    globalCompanyIndex,
+                    DocumentType.TAX_INVOICE,
+                    null
+            );
+
+            if (taxInvoice != null) {
+                seededTaxInvoices.add(taxInvoice);
+            }
 
             seedSingleInvoice(
                     tenant.getTenantId(),
@@ -546,31 +575,62 @@ public class DemoSeeder implements ApplicationRunner {
                     products,
                     invoiceOffset,
                     globalCompanyIndex,
-                    DocumentType.TAX_INVOICE
+                    DocumentType.PROFORMA_INVOICE,
+                    null
+            );
+        }
+
+        for (int i = 0; i < seededTaxInvoices.size(); i++) {
+            InvoiceDto referenceInvoice = seededTaxInvoices.get(i);
+            int invoiceOffset = i + 1;
+
+            Customer referenceCustomer = customers.stream()
+                    .filter(c -> c.getId().equals(referenceInvoice.getCustomerId()))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("Customer not found for reference invoice"));
+
+            seedSingleInvoice(
+                    tenant.getTenantId(),
+                    company,
+                    referenceCustomer,
+                    products,
+                    invoiceOffset,
+                    globalCompanyIndex,
+                    DocumentType.CREDIT_NOTE,
+                    referenceInvoice
             );
 
             seedSingleInvoice(
                     tenant.getTenantId(),
                     company,
-                    customer,
+                    referenceCustomer,
                     products,
                     invoiceOffset,
                     globalCompanyIndex,
-                    DocumentType.PROFORMA_INVOICE
+                    DocumentType.DEBIT_NOTE,
+                    referenceInvoice
             );
         }
     }
 
-    private void seedSingleInvoice(
+    private InvoiceDto seedSingleInvoice(
             Long tenantId,
             Company company,
             Customer customer,
             List<Product> products,
             int invoiceOffset,
             int globalCompanyIndex,
-            DocumentType documentType
+            DocumentType documentType,
+            InvoiceDto referenceInvoice
     ) {
-        int invoiceSeed = (globalCompanyIndex * 100) + invoiceOffset + (documentType == DocumentType.PROFORMA_INVOICE ? 1000 : 0);
+        int seedDiscriminator = switch (documentType) {
+            case TAX_INVOICE -> 0;
+            case PROFORMA_INVOICE -> 1000;
+            case CREDIT_NOTE -> 2000;
+            case DEBIT_NOTE -> 3000;
+        };
+
+        int invoiceSeed = (globalCompanyIndex * 100) + invoiceOffset + seedDiscriminator;
 
         Product firstProduct = products.get((invoiceOffset - 1) % products.size());
         Product secondProduct = products.get(invoiceOffset % products.size());
@@ -578,6 +638,7 @@ public class DemoSeeder implements ApplicationRunner {
         CreateInvoiceRequest request = new CreateInvoiceRequest();
         request.setCustomerId(customer.getId());
         request.setDocumentType(documentType);
+        request.setReferenceInvoiceId(referenceInvoice != null ? referenceInvoice.getId() : null);
         request.setInvoiceDate(LocalDate.now().minusDays(invoiceSeed % 25));
         request.setNotes("Demo " + resolveDocumentLabel(documentType).toLowerCase() + " generated by seed data");
         request.setTermsAndConditions("Payment due within agreed credit period.");
@@ -597,11 +658,12 @@ public class DemoSeeder implements ApplicationRunner {
         request.setLines(List.of(line1, line2));
 
         try {
-            invoiceService.createForSeed(tenantId, company.getId(), request);
+            return invoiceService.createForSeed(tenantId, company.getId(), request);
         } catch (IllegalArgumentException ex) {
             if (!isDuplicateInvoiceNumberError(ex)) {
                 throw ex;
             }
+            return null;
         }
     }
 

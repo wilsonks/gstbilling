@@ -17,16 +17,22 @@ public class InvoiceValidator {
                 ? request.getDocumentType()
                 : DocumentType.TAX_INVOICE;
 
-        if (documentType == DocumentType.CREDIT_NOTE || documentType == DocumentType.DEBIT_NOTE) {
-            throw new IllegalArgumentException("Credit note and debit note are not supported yet");
-        }
-
         if (request.getCustomerId() == null) {
             throw new IllegalArgumentException("Customer is required");
         }
 
         if (request.getInvoiceDate() == null) {
             throw new IllegalArgumentException("Invoice date is required");
+        }
+
+        if ((documentType == DocumentType.CREDIT_NOTE || documentType == DocumentType.DEBIT_NOTE)
+                && request.getReferenceInvoiceId() == null) {
+            throw new IllegalArgumentException("Reference invoice is required for credit note and debit note");
+        }
+
+        if ((documentType == DocumentType.TAX_INVOICE || documentType == DocumentType.PROFORMA_INVOICE)
+                && request.getReferenceInvoiceId() != null) {
+            throw new IllegalArgumentException("Reference invoice is not allowed for tax invoice or proforma invoice");
         }
 
         if (request.getLines() == null || request.getLines().isEmpty()) {

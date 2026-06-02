@@ -10,6 +10,7 @@ import java.util.List;
 public class CreateInvoiceRequest {
     private Long customerId;
     private DocumentType documentType;
+    private Long referenceInvoiceId;
     private LocalDate invoiceDate;
     private String notes;
     private String termsAndConditions;

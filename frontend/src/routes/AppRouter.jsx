@@ -39,6 +39,14 @@ import ProformaInvoicePage from "../features/invoice/ProformaInvoicePage";
 import ProformaInvoiceCreatePage from "../features/invoice/ProformaInvoiceCreatePage";
 import ProformaInvoiceDetailsPage from "../features/invoice/ProformaInvoiceDetailsPage";
 
+import CreditNotePage from "../features/invoice/CreditNotePage";
+import CreditNoteCreatePage from "../features/invoice/CreditNoteCreatePage";
+import CreditNoteDetailsPage from "../features/invoice/CreditNoteDetailsPage";
+
+import DebitNotePage from "../features/invoice/DebitNotePage";
+import DebitNoteCreatePage from "../features/invoice/DebitNoteCreatePage";
+import DebitNoteDetailsPage from "../features/invoice/DebitNoteDetailsPage";
+
 /* =========================================================
  * Admin Pages
  * =======================================================*/
@@ -217,6 +225,74 @@ export default function AppRouter() {
           <ProtectedRoute>
             <AppLayout>
               <ProformaInvoiceDetailsPage />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Credit Notes */}
+      <Route
+        path="/credit-notes"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <CreditNotePage />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/credit-notes/new"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <CreditNoteCreatePage />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/credit-notes/:id"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <CreditNoteDetailsPage />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Debit Notes */}
+      <Route
+        path="/debit-notes"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <DebitNotePage />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/debit-notes/new"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <DebitNoteCreatePage />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/debit-notes/:id"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <DebitNoteDetailsPage />
             </AppLayout>
           </ProtectedRoute>
         }
