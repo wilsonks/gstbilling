@@ -1,9 +1,9 @@
 import React from "react";
-import DocumentDetailsPage from "./components/DocumentDetailsPage";
+import DocumentDetailsModal from "./components/DocumentDetailsModal";
 
 export default function ProformaInvoiceDetailsPage() {
   return (
-    <DocumentDetailsPage
+    <DocumentDetailsModal
       expectedDocumentType="PROFORMA_INVOICE"
       title="Proforma Invoice"
     />

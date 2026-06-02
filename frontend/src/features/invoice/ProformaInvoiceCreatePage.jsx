@@ -1,12 +1,12 @@
 import React from "react";
-import DocumentCreateForm from "./components/DocumentCreateForm";
+import DocumentCreateModal from "./components/DocumentCreateModal";
 
 export default function ProformaInvoiceCreatePage() {
   return (
-    <DocumentCreateForm
+    <DocumentCreateModal
       documentType="PROFORMA_INVOICE"
       title="Create Proforma Invoice"
-      description="Create a proforma invoice for pre-sales or quotation-style billing."
+      description="Create a new proforma invoice for a customer."
       successTitle="Proforma invoice created"
     />
   );

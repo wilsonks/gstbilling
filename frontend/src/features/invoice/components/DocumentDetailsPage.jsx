@@ -24,12 +24,7 @@ import {
   useToast,
 } from "@chakra-ui/react";
 import { ArrowLeft, Download, Printer } from "lucide-react";
-import {
-  Link as RouterLink,
-  useLocation,
-  useNavigate,
-  useParams,
-} from "react-router-dom";
+import { Link as RouterLink, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   cancelInvoice,
   exportInvoicePdf,
@@ -95,7 +90,12 @@ function resolveDetailPath(documentType, id) {
   }
 }
 
-export default function DocumentDetailsPage({ expectedDocumentType, title }) {
+export default function DocumentDetailsPage({
+  expectedDocumentType,
+  title,
+  embedded = false,
+  onClose,
+}) {
   const { id } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -107,6 +107,11 @@ export default function DocumentDetailsPage({ expectedDocumentType, title }) {
   const [cancelling, setCancelling] = useState(false);
 
   const handleBack = () => {
+    if (embedded && onClose) {
+      onClose();
+      return;
+    }
+
     if (!invoice) {
       navigate("/invoices");
       return;
@@ -162,11 +167,12 @@ export default function DocumentDetailsPage({ expectedDocumentType, title }) {
         isClosable: true,
       });
 
-      navigate(
-        resolveDocumentListPath(
-          updated.documentType || invoice.documentType || "TAX_INVOICE",
-        ),
-      );
+      if (embedded && onClose) {
+        onClose();
+        return;
+      }
+
+      navigate(resolveDocumentListPath(updated.documentType || invoice.documentType || "TAX_INVOICE"));
     } catch (error) {
       toast({
         title: "Failed to cancel document",
@@ -184,7 +190,9 @@ export default function DocumentDetailsPage({ expectedDocumentType, title }) {
     if (!invoice?.id) return;
     navigate("/credit-notes/new", {
       state: {
+        backgroundLocation: location.state?.backgroundLocation || location,
         referenceInvoiceId: invoice.id,
+        returnTo: resolveDetailPath(invoice.documentType, invoice.id),
       },
     });
   };
@@ -193,7 +201,9 @@ export default function DocumentDetailsPage({ expectedDocumentType, title }) {
     if (!invoice?.id) return;
     navigate("/debit-notes/new", {
       state: {
+        backgroundLocation: location.state?.backgroundLocation || location,
         referenceInvoiceId: invoice.id,
+        returnTo: resolveDetailPath(invoice.documentType, invoice.id),
       },
     });
   };
@@ -212,6 +222,7 @@ export default function DocumentDetailsPage({ expectedDocumentType, title }) {
 
           navigate(`${redirectPath}${location.search || ""}`, {
             replace: true,
+            state: location.state,
           });
 
           return;
@@ -232,7 +243,7 @@ export default function DocumentDetailsPage({ expectedDocumentType, title }) {
     };
 
     load();
-  }, [id, expectedDocumentType, navigate, location.search, toast]);
+  }, [id, expectedDocumentType, navigate, location.search, location.state, toast]);
 
   useEffect(() => {
     if (!invoice) return;
@@ -247,9 +258,9 @@ export default function DocumentDetailsPage({ expectedDocumentType, title }) {
   const isNote =
     invoice?.documentType === "CREDIT_NOTE" ||
     invoice?.documentType === "DEBIT_NOTE";
-  const isTaxInvoice = invoice?.documentType === "TAX_INVOICE";
   const canCreateNotes =
-    invoice?.documentType === "TAX_INVOICE" && invoice?.status !== "CANCELLED";
+    invoice?.documentType === "TAX_INVOICE" &&
+    invoice?.status !== "CANCELLED";
 
   const handleDownloadPdf = async () => {
     if (!invoice?.id) return;
@@ -299,91 +310,119 @@ export default function DocumentDetailsPage({ expectedDocumentType, title }) {
 
   return (
     <Stack spacing={6}>
-      <Flex
-        justify="space-between"
-        align={{ base: "stretch", md: "center" }}
-        direction={{ base: "column", md: "row" }}
-        gap={4}
-      >
-        <Box>
-          <Button
-            size="sm"
-            variant="outline"
-            leftIcon={<ArrowLeft size={14} />}
-            onClick={handleBack}
-            mb={3}
-          >
-            Back
-          </Button>
-          <Heading size="lg">{invoice.invoiceNo || title}</Heading>
-          <Text color="gray.500" mt={1}>
-            View document details, PDF preview, and export.
-          </Text>
-        </Box>
-
-        <HStack spacing={3} flexWrap="wrap">
-          {canCreateNotes && (
-            <>
-              <Button
-                variant="outline"
-                colorScheme="teal"
-                onClick={handleCreateCreditNote}
-              >
-                Create Credit Note
-              </Button>
-              <Button
-                variant="outline"
-                colorScheme="orange"
-                onClick={handleCreateDebitNote}
-              >
-                Create Debit Note
-              </Button>
-            </>
-          )}
-
-          <Button
-            variant="outline"
-            leftIcon={<Printer size={16} />}
-            onClick={() => handlePrint()}
-          >
-            Print
-          </Button>
-          <Button
-            colorScheme="blue"
-            variant="outline"
-            leftIcon={<Download size={16} />}
-            onClick={handleDownloadPdf}
-            isLoading={downloading}
-          >
-            Download PDF
-          </Button>
-          {invoice.status !== "CANCELLED" && (
+      {!embedded && (
+        <Flex
+          justify="space-between"
+          align={{ base: "stretch", md: "center" }}
+          direction={{ base: "column", md: "row" }}
+          gap={4}
+        >
+          <Box>
             <Button
-              colorScheme="red"
+              size="sm"
               variant="outline"
-              onClick={handleCancel}
-              isLoading={cancelling}
+              leftIcon={<ArrowLeft size={14} />}
+              onClick={handleBack}
+              mb={3}
             >
-              Cancel
+              Back
             </Button>
-          )}
-        </HStack>
-      </Flex>
+            <Heading size="lg">{invoice.invoiceNo || title}</Heading>
+            <Text color="gray.500" mt={1}>
+              View document details, PDF preview, and export.
+            </Text>
+          </Box>
 
-      <Card
-        borderWidth="1px"
-        borderColor="gray.200"
-        shadow="sm"
-        borderRadius="xl"
-      >
+          <HStack spacing={3} flexWrap="wrap">
+            {canCreateNotes && (
+              <>
+                <Button variant="outline" colorScheme="teal" onClick={handleCreateCreditNote}>
+                  Create Credit Note
+                </Button>
+                <Button variant="outline" colorScheme="orange" onClick={handleCreateDebitNote}>
+                  Create Debit Note
+                </Button>
+              </>
+            )}
+
+            <Button
+              variant="outline"
+              leftIcon={<Printer size={16} />}
+              onClick={() => handlePrint()}
+            >
+              Print
+            </Button>
+            <Button
+              colorScheme="blue"
+              variant="outline"
+              leftIcon={<Download size={16} />}
+              onClick={handleDownloadPdf}
+              isLoading={downloading}
+            >
+              Download PDF
+            </Button>
+            {invoice.status !== "CANCELLED" && (
+              <Button
+                colorScheme="red"
+                variant="outline"
+                onClick={handleCancel}
+                isLoading={cancelling}
+              >
+                Cancel
+              </Button>
+            )}
+          </HStack>
+        </Flex>
+      )}
+
+      {embedded && (
+        <Flex justify="flex-end">
+          <HStack spacing={3} flexWrap="wrap">
+            {canCreateNotes && (
+              <>
+                <Button variant="outline" colorScheme="teal" onClick={handleCreateCreditNote}>
+                  Create Credit Note
+                </Button>
+                <Button variant="outline" colorScheme="orange" onClick={handleCreateDebitNote}>
+                  Create Debit Note
+                </Button>
+              </>
+            )}
+
+            <Button
+              variant="outline"
+              leftIcon={<Printer size={16} />}
+              onClick={() => handlePrint()}
+            >
+              Print
+            </Button>
+            <Button
+              colorScheme="blue"
+              variant="outline"
+              leftIcon={<Download size={16} />}
+              onClick={handleDownloadPdf}
+              isLoading={downloading}
+            >
+              Download PDF
+            </Button>
+            {invoice.status !== "CANCELLED" && (
+              <Button
+                colorScheme="red"
+                variant="outline"
+                onClick={handleCancel}
+                isLoading={cancelling}
+              >
+                Cancel
+              </Button>
+            )}
+          </HStack>
+        </Flex>
+      )}
+
+      <Card borderWidth="1px" borderColor="gray.200" shadow="sm" borderRadius="xl">
         <CardBody>
           <Stack spacing={6}>
-            <Flex
-              justify="space-between"
-              align="flex-start"
-              wrap="wrap"
-              gap={4}
-            >
+            <Flex justify="space-between" align="flex-start" wrap="wrap" gap={4}>
               <Box>
                 <Text
                   fontSize="xs"
@@ -406,8 +445,8 @@ export default function DocumentDetailsPage({ expectedDocumentType, title }) {
                   invoice.status === "CANCELLED"
                     ? "red"
                     : invoice.status === "ISSUED"
-                      ? "green"
-                      : "gray"
+                    ? "green"
+                    : "gray"
                 }
               >
                 {invoice.status || "—"}
@@ -424,9 +463,12 @@ export default function DocumentDetailsPage({ expectedDocumentType, title }) {
                       to={`/invoices/${invoice.referenceInvoiceId}`}
                       color="blue.600"
                       fontWeight="600"
+                      state={{
+                        backgroundLocation: location.state?.backgroundLocation || location,
+                        returnTo: resolveDetailPath(invoice.documentType, invoice.id),
+                      }}
                     >
-                      {invoice.referenceInvoiceNo ||
-                        `Invoice #${invoice.referenceInvoiceId}`}
+                      {invoice.referenceInvoiceNo || `Invoice #${invoice.referenceInvoiceId}`}
                     </ChakraLink>
                   </Stack>
                 </CardBody>
@@ -437,20 +479,14 @@ export default function DocumentDetailsPage({ expectedDocumentType, title }) {
               <GridItem>
                 <PrintSection title="Seller">
                   <Text fontWeight="700">{invoice.sellerLegalName || "—"}</Text>
-                  <Text color="gray.600">
-                    GSTIN: {invoice.sellerGstin || "—"}
-                  </Text>
+                  <Text color="gray.600">GSTIN: {invoice.sellerGstin || "—"}</Text>
                 </PrintSection>
               </GridItem>
 
               <GridItem>
                 <PrintSection title="Customer">
-                  <Text fontWeight="700">
-                    {invoice.customerLegalName || "—"}
-                  </Text>
-                  <Text color="gray.600">
-                    GSTIN: {invoice.customerGstin || "—"}
-                  </Text>
+                  <Text fontWeight="700">{invoice.customerLegalName || "—"}</Text>
+                  <Text color="gray.600">GSTIN: {invoice.customerGstin || "—"}</Text>
                 </PrintSection>
               </GridItem>
             </Grid>
@@ -464,9 +500,7 @@ export default function DocumentDetailsPage({ expectedDocumentType, title }) {
                   </Flex>
                   <Flex justify="space-between">
                     <Text color="gray.500">Date</Text>
-                    <Text fontWeight="600">
-                      {formatDate(invoice.invoiceDate)}
-                    </Text>
+                    <Text fontWeight="600">{formatDate(invoice.invoiceDate)}</Text>
                   </Flex>
                   <Flex justify="space-between">
                     <Text color="gray.500">Due Date</Text>
@@ -483,15 +517,11 @@ export default function DocumentDetailsPage({ expectedDocumentType, title }) {
                 <PrintSection title="Amount Summary">
                   <Flex justify="space-between">
                     <Text color="gray.500">Taxable Amount</Text>
-                    <Text fontWeight="600">
-                      {formatCurrency(invoice.totalTaxableAmount)}
-                    </Text>
+                    <Text fontWeight="600">{formatCurrency(invoice.totalTaxableAmount)}</Text>
                   </Flex>
                   <Flex justify="space-between">
                     <Text color="gray.500">Total Tax</Text>
-                    <Text fontWeight="600">
-                      {formatCurrency(invoice.totalTaxAmount)}
-                    </Text>
+                    <Text fontWeight="600">{formatCurrency(invoice.totalTaxAmount)}</Text>
                   </Flex>
                   <Flex justify="space-between">
                     <Text color="gray.500">Grand Total</Text>
@@ -530,14 +560,10 @@ export default function DocumentDetailsPage({ expectedDocumentType, title }) {
                             <Td>{line.description || "—"}</Td>
                             <Td>{formatNumber(line.quantity, 3)}</Td>
                             <Td isNumeric>{formatCurrency(line.unitPrice)}</Td>
-                            <Td isNumeric>
-                              {formatCurrency(line.taxableAmount)}
-                            </Td>
+                            <Td isNumeric>{formatCurrency(line.taxableAmount)}</Td>
                             <Td isNumeric>{formatNumber(line.gstRate, 2)}%</Td>
                             <Td isNumeric>{formatCurrency(taxAmount(line))}</Td>
-                            <Td isNumeric>
-                              {formatCurrency(line.lineTotalAmount)}
-                            </Td>
+                            <Td isNumeric>{formatCurrency(line.lineTotalAmount)}</Td>
                           </Tr>
                         ))}
                       </Tbody>

@@ -1,5 +1,5 @@
 import React from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useSelector } from "react-redux";
 
 /* =========================================================
@@ -64,428 +64,122 @@ import AuditLogDetailsModal from "../features/admin/AuditLogDetailsModal";
 import MetricsPage from "../features/admin/MetricsPage";
 import BillingPage from "../features/admin/BillingPage";
 
-export default function AppRouter() {
+function AppRouterContent() {
+  const location = useLocation();
+  const backgroundLocation = location.state?.backgroundLocation;
   const { accessToken, scope } = useSelector((state) => state.auth);
 
-  return (
-    <Routes>
-      <Route
-        path="/"
-        element={
-          accessToken ? (
-            scope === "PLATFORM" ? (
-              <Navigate to="/admin" replace />
-            ) : (
-              <Navigate to="/dashboard" replace />
-            )
-          ) : (
-            <LoginPage />
-          )
-        }
-      />
-      <Route path="/register" element={<RegisterPage />} />
-
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute>
-            <AppLayout>
-              <TenantDashboardPage />
-            </AppLayout>
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/companies"
-        element={
-          <ProtectedRoute>
-            <AppLayout>
-              <TenantCompanyPage />
-            </AppLayout>
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/users"
-        element={
-          <ProtectedRoute>
-            <AppLayout>
-              <TenantUserPage />
-            </AppLayout>
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/user-access"
-        element={
-          <ProtectedRoute>
-            <AppLayout>
-              <TenantUserAccessPage />
-            </AppLayout>
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/products"
-        element={
-          <ProtectedRoute>
-            <AppLayout>
-              <ProductPage />
-            </AppLayout>
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/customers"
-        element={
-          <ProtectedRoute>
-            <AppLayout>
-              <CustomerPage />
-            </AppLayout>
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/invoice-sequences"
-        element={
-          <ProtectedRoute>
-            <AppLayout>
-              <InvoiceSequencePage />
-            </AppLayout>
-          </ProtectedRoute>
-        }
-      />
-
-      {/* Tax Invoices */}
-      <Route
-        path="/invoices"
-        element={
-          <ProtectedRoute>
-            <AppLayout>
-              <InvoicePage />
-            </AppLayout>
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/invoices/new"
-        element={
-          <ProtectedRoute>
-            <AppLayout>
-              <TaxInvoiceCreatePage />
-            </AppLayout>
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/invoices/:id"
-        element={
-          <ProtectedRoute>
-            <AppLayout>
-              <InvoiceDetailsPage />
-            </AppLayout>
-          </ProtectedRoute>
-        }
-      />
-
-      {/* Proforma Invoices */}
-      <Route
-        path="/proforma-invoices"
-        element={
-          <ProtectedRoute>
-            <AppLayout>
-              <ProformaInvoicePage />
-            </AppLayout>
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/proforma-invoices/new"
-        element={
-          <ProtectedRoute>
-            <AppLayout>
-              <ProformaInvoiceCreatePage />
-            </AppLayout>
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/proforma-invoices/:id"
-        element={
-          <ProtectedRoute>
-            <AppLayout>
-              <ProformaInvoiceDetailsPage />
-            </AppLayout>
-          </ProtectedRoute>
-        }
-      />
-
-      {/* Credit Notes */}
-      <Route
-        path="/credit-notes"
-        element={
-          <ProtectedRoute>
-            <AppLayout>
-              <CreditNotePage />
-            </AppLayout>
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/credit-notes/new"
-        element={
-          <ProtectedRoute>
-            <AppLayout>
-              <CreditNoteCreatePage />
-            </AppLayout>
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/credit-notes/:id"
-        element={
-          <ProtectedRoute>
-            <AppLayout>
-              <CreditNoteDetailsPage />
-            </AppLayout>
-          </ProtectedRoute>
-        }
-      />
-
-      {/* Debit Notes */}
-      <Route
-        path="/debit-notes"
-        element={
-          <ProtectedRoute>
-            <AppLayout>
-              <DebitNotePage />
-            </AppLayout>
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/debit-notes/new"
-        element={
-          <ProtectedRoute>
-            <AppLayout>
-              <DebitNoteCreatePage />
-            </AppLayout>
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/debit-notes/:id"
-        element={
-          <ProtectedRoute>
-            <AppLayout>
-              <DebitNoteDetailsPage />
-            </AppLayout>
-          </ProtectedRoute>
-        }
-      />
-
-      {/* Legacy redirects */}
-      <Route path="/invoice" element={<Navigate to="/invoices" replace />} />
-      <Route path="/invoice/new" element={<Navigate to="/invoices/new" replace />} />
-      <Route path="/parties" element={<Navigate to="/customers" replace />} />
-
-      <Route
-        path="/admin"
-        element={
-          <ProtectedRoute>
-            <PlatformRoute>
-              <AdminLayout>
-                <DashboardPage />
-              </AdminLayout>
-            </PlatformRoute>
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/admin/tenants"
-        element={
-          <ProtectedRoute>
-            <PlatformRoute>
-              <AdminLayout>
-                <TenantPage />
-              </AdminLayout>
-            </PlatformRoute>
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/admin/tenants/:id"
-        element={
-          <ProtectedRoute>
-            <PlatformRoute>
-              <AdminLayout>
-                <TenantDetailsPage />
-              </AdminLayout>
-            </PlatformRoute>
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/admin/companies"
-        element={
-          <ProtectedRoute>
-            <PlatformRoute>
-              <AdminLayout>
-                <CompanyPage />
-              </AdminLayout>
-            </PlatformRoute>
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/admin/companies/:id"
-        element={
-          <ProtectedRoute>
-            <PlatformRoute>
-              <AdminLayout>
-                <CompanyDetailsPage />
-              </AdminLayout>
-            </PlatformRoute>
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/admin/users"
-        element={
-          <ProtectedRoute>
-            <PlatformRoute>
-              <AdminLayout>
-                <UserPage />
-              </AdminLayout>
-            </PlatformRoute>
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/admin/users/:id"
-        element={
-          <ProtectedRoute>
-            <PlatformRoute>
-              <AdminLayout>
-                <UserDetailsPage />
-              </AdminLayout>
-            </PlatformRoute>
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/admin/user-access"
-        element={
-          <ProtectedRoute>
-            <PlatformRoute>
-              <AdminLayout>
-                <UserAccessPage />
-              </AdminLayout>
-            </PlatformRoute>
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/admin/user-access/:id"
-        element={
-          <ProtectedRoute>
-            <PlatformRoute>
-              <AdminLayout>
-                <UserAccessDetailsPage />
-              </AdminLayout>
-            </PlatformRoute>
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/admin/audit-logs"
-        element={
-          <ProtectedRoute>
-            <PlatformRoute>
-              <AdminLayout>
-                <AuditLogsPage />
-              </AdminLayout>
-            </PlatformRoute>
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/admin/audit-logs/:id"
-        element={
-          <ProtectedRoute>
-            <PlatformRoute>
-              <AdminLayout>
-                <AuditLogDetailsModal />
-              </AdminLayout>
-            </PlatformRoute>
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/admin/metrics"
-        element={
-          <ProtectedRoute>
-            <PlatformRoute>
-              <AdminLayout>
-                <MetricsPage />
-              </AdminLayout>
-            </PlatformRoute>
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/admin/billing"
-        element={
-          <ProtectedRoute>
-            <PlatformRoute>
-              <AdminLayout>
-                <BillingPage />
-              </AdminLayout>
-            </PlatformRoute>
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="*"
-        element={
-          accessToken ? (
-            scope === "PLATFORM" ? (
-              <Navigate to="/admin" replace />
-            ) : (
-              <Navigate to="/dashboard" replace />
-            )
-          ) : (
-            <Navigate to="/" replace />
-          )
-        }
-      />
-    </Routes>
+  const tenantWrapped = (element) => (
+    <ProtectedRoute>
+      <AppLayout>{element}</AppLayout>
+    </ProtectedRoute>
   );
+
+  const adminWrapped = (element) => (
+    <ProtectedRoute>
+      <PlatformRoute>
+        <AdminLayout>{element}</AdminLayout>
+      </PlatformRoute>
+    </ProtectedRoute>
+  );
+
+  return (
+    <>
+      <Routes location={backgroundLocation || location}>
+        <Route
+          path="/"
+          element={
+            accessToken ? (
+              scope === "PLATFORM" ? (
+                <Navigate to="/admin" replace />
+              ) : (
+                <Navigate to="/dashboard" replace />
+              )
+            ) : (
+              <LoginPage />
+            )
+          }
+        />
+        <Route path="/register" element={<RegisterPage />} />
+
+        <Route path="/dashboard" element={tenantWrapped(<TenantDashboardPage />)} />
+        <Route path="/companies" element={tenantWrapped(<TenantCompanyPage />)} />
+        <Route path="/users" element={tenantWrapped(<TenantUserPage />)} />
+        <Route path="/user-access" element={tenantWrapped(<TenantUserAccessPage />)} />
+        <Route path="/products" element={tenantWrapped(<ProductPage />)} />
+        <Route path="/customers" element={tenantWrapped(<CustomerPage />)} />
+        <Route path="/invoice-sequences" element={tenantWrapped(<InvoiceSequencePage />)} />
+
+        <Route path="/invoices" element={tenantWrapped(<InvoicePage />)} />
+        <Route path="/invoices/new" element={tenantWrapped(<TaxInvoiceCreatePage />)} />
+        <Route path="/invoices/:id" element={tenantWrapped(<InvoiceDetailsPage />)} />
+
+        <Route path="/proforma-invoices" element={tenantWrapped(<ProformaInvoicePage />)} />
+        <Route path="/proforma-invoices/new" element={tenantWrapped(<ProformaInvoiceCreatePage />)} />
+        <Route path="/proforma-invoices/:id" element={tenantWrapped(<ProformaInvoiceDetailsPage />)} />
+
+        <Route path="/credit-notes" element={tenantWrapped(<CreditNotePage />)} />
+        <Route path="/credit-notes/new" element={tenantWrapped(<CreditNoteCreatePage />)} />
+        <Route path="/credit-notes/:id" element={tenantWrapped(<CreditNoteDetailsPage />)} />
+
+        <Route path="/debit-notes" element={tenantWrapped(<DebitNotePage />)} />
+        <Route path="/debit-notes/new" element={tenantWrapped(<DebitNoteCreatePage />)} />
+        <Route path="/debit-notes/:id" element={tenantWrapped(<DebitNoteDetailsPage />)} />
+
+        {/* Legacy redirects */}
+        <Route path="/invoice" element={<Navigate to="/invoices" replace />} />
+        <Route path="/invoice/new" element={<Navigate to="/invoices/new" replace />} />
+        <Route path="/parties" element={<Navigate to="/customers" replace />} />
+
+        <Route path="/admin" element={adminWrapped(<DashboardPage />)} />
+        <Route path="/admin/tenants" element={adminWrapped(<TenantPage />)} />
+        <Route path="/admin/tenants/:id" element={adminWrapped(<TenantDetailsPage />)} />
+        <Route path="/admin/companies" element={adminWrapped(<CompanyPage />)} />
+        <Route path="/admin/companies/:id" element={adminWrapped(<CompanyDetailsPage />)} />
+        <Route path="/admin/users" element={adminWrapped(<UserPage />)} />
+        <Route path="/admin/users/:id" element={adminWrapped(<UserDetailsPage />)} />
+        <Route path="/admin/user-access" element={adminWrapped(<UserAccessPage />)} />
+        <Route path="/admin/user-access/:id" element={adminWrapped(<UserAccessDetailsPage />)} />
+        <Route path="/admin/audit-logs" element={adminWrapped(<AuditLogsPage />)} />
+        <Route path="/admin/audit-logs/:id" element={adminWrapped(<AuditLogDetailsModal />)} />
+        <Route path="/admin/metrics" element={adminWrapped(<MetricsPage />)} />
+        <Route path="/admin/billing" element={adminWrapped(<BillingPage />)} />
+
+        <Route
+          path="*"
+          element={
+            accessToken ? (
+              scope === "PLATFORM" ? (
+                <Navigate to="/admin" replace />
+              ) : (
+                <Navigate to="/dashboard" replace />
+              )
+            ) : (
+              <Navigate to="/" replace />
+            )
+          }
+        />
+      </Routes>
+
+      {backgroundLocation && (
+        <Routes>
+          <Route path="/invoices/new" element={tenantWrapped(<TaxInvoiceCreatePage />)} />
+          <Route path="/invoices/:id" element={tenantWrapped(<InvoiceDetailsPage />)} />
+
+          <Route path="/proforma-invoices/new" element={tenantWrapped(<ProformaInvoiceCreatePage />)} />
+          <Route path="/proforma-invoices/:id" element={tenantWrapped(<ProformaInvoiceDetailsPage />)} />
+
+          <Route path="/credit-notes/new" element={tenantWrapped(<CreditNoteCreatePage />)} />
+          <Route path="/credit-notes/:id" element={tenantWrapped(<CreditNoteDetailsPage />)} />
+
+          <Route path="/debit-notes/new" element={tenantWrapped(<DebitNoteCreatePage />)} />
+          <Route path="/debit-notes/:id" element={tenantWrapped(<DebitNoteDetailsPage />)} />
+        </Routes>
+      )}
+    </>
+  );
+}
+
+export default function AppRouter() {
+  return <AppRouterContent />;
 }

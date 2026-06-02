@@ -61,6 +61,8 @@ export default function DocumentCreateForm({
   title,
   description,
   successTitle,
+  embedded = false,
+  onCancel,
 }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -91,6 +93,11 @@ export default function DocumentCreateForm({
   });
 
   const handleBack = () => {
+    if (embedded && onCancel) {
+      onCancel();
+      return;
+    }
+
     navigate(resolveDocumentListPath(documentType));
   };
 
@@ -417,34 +424,57 @@ export default function DocumentCreateForm({
 
   return (
     <Stack spacing={6}>
-      <Flex justify="space-between" align="center" wrap="wrap" gap={4}>
-        <Box>
-          <HStack spacing={3} mb={2}>
-            <Button
-              size="sm"
-              variant="outline"
-              leftIcon={<ArrowLeft size={14} />}
-              onClick={handleBack}
-            >
-              Back
+      {!embedded && (
+        <Flex justify="space-between" align="center" wrap="wrap" gap={4}>
+          <Box>
+            <HStack spacing={3} mb={2}>
+              <Button
+                size="sm"
+                variant="outline"
+                leftIcon={<ArrowLeft size={14} />}
+                onClick={handleBack}
+              >
+                Back
+              </Button>
+            </HStack>
+
+            <Heading size="lg">{title}</Heading>
+            <Text color="gray.500" mt={1}>
+              {description}
+            </Text>
+          </Box>
+
+          <Button colorScheme="blue" onClick={handleSubmit} isLoading={saving}>
+            Create
+          </Button>
+        </Flex>
+      )}
+
+      {embedded && (
+        <Flex justify="flex-end">
+          <HStack spacing={3}>
+            <Button variant="outline" onClick={handleBack}>
+              Cancel
+            </Button>
+            <Button colorScheme="blue" onClick={handleSubmit} isLoading={saving}>
+              Create
             </Button>
           </HStack>
-
-          <Heading size="lg">{title}</Heading>
-          <Text color="gray.500" mt={1}>
-            {description}
-          </Text>
-        </Box>
-
-        <Button colorScheme="blue" onClick={handleSubmit} isLoading={saving}>
-          Create
-        </Button>
-      </Flex>
+        </Flex>
+      )}
 
       <Card borderWidth="1px" borderColor="gray.200" shadow="sm" borderRadius="xl">
         <CardBody>
           <Stack spacing={5}>
-            <Heading size="md">Header</Heading>
+            {!embedded && <Heading size="md">Header</Heading>}
+            {embedded && (
+              <Box>
+                <Heading size="md">{title}</Heading>
+                <Text color="gray.500" mt={1}>
+                  {description}
+                </Text>
+              </Box>
+            )}
 
             {requiresReference && (
               <Stack spacing={4}>

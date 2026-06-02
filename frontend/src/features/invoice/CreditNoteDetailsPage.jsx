@@ -1,9 +1,9 @@
 import React from "react";
-import DocumentDetailsPage from "./components/DocumentDetailsPage";
+import DocumentDetailsModal from "./components/DocumentDetailsModal";
 
 export default function CreditNoteDetailsPage() {
   return (
-    <DocumentDetailsPage
+    <DocumentDetailsModal
       expectedDocumentType="CREDIT_NOTE"
       title="Credit Note"
     />

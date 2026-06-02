@@ -1,9 +1,9 @@
 import React from "react";
-import DocumentDetailsPage from "./components/DocumentDetailsPage";
+import DocumentDetailsModal from "./components/DocumentDetailsModal";
 
 export default function InvoiceDetailsPage() {
   return (
-    <DocumentDetailsPage
+    <DocumentDetailsModal
       expectedDocumentType="TAX_INVOICE"
       title="Tax Invoice"
     />

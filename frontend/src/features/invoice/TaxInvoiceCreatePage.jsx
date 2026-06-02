@@ -1,12 +1,12 @@
 import React from "react";
-import DocumentCreateForm from "./components/DocumentCreateForm";
+import DocumentCreateModal from "./components/DocumentCreateModal";
 
 export default function TaxInvoiceCreatePage() {
   return (
-    <DocumentCreateForm
+    <DocumentCreateModal
       documentType="TAX_INVOICE"
       title="Create Tax Invoice"
-      description="Create a tax invoice with product lines, pricing, and GST preview."
+      description="Create a new tax invoice for a customer."
       successTitle="Tax invoice created"
     />
   );

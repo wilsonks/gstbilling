@@ -37,7 +37,7 @@ import {
   RefreshCw,
   Search,
 } from "lucide-react";
-import { Link as RouterLink, useNavigate } from "react-router-dom";
+import { Link as RouterLink, useLocation, useNavigate } from "react-router-dom";
 import {
   cancelInvoice,
   exportInvoicePdf,
@@ -87,6 +87,7 @@ export default function DocumentListPage({
   createPath,
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const toast = useToast();
 
   const [rows, setRows] = useState([]);
@@ -259,7 +260,12 @@ export default function DocumentListPage({
   };
 
   const handleViewDocument = (invoice) => {
-    navigate(resolveDocumentDetailPath(invoice));
+    navigate(resolveDocumentDetailPath(invoice), {
+      state: {
+        backgroundLocation: location,
+        returnTo: location.pathname + location.search,
+      },
+    });
   };
 
   return (
@@ -287,7 +293,17 @@ export default function DocumentListPage({
             Refresh
           </Button>
 
-          <Button colorScheme="blue" onClick={() => navigate(createPath)}>
+          <Button
+            colorScheme="blue"
+            onClick={() =>
+              navigate(createPath, {
+                state: {
+                  backgroundLocation: location,
+                  returnTo: location.pathname + location.search,
+                },
+              })
+            }
+          >
             {createLabel}
           </Button>
         </HStack>
@@ -395,6 +411,10 @@ export default function DocumentListPage({
                                 to={`/invoices/${invoice.referenceInvoiceId}`}
                                 color="blue.600"
                                 fontWeight="600"
+                                state={{
+                                  backgroundLocation: location,
+                                  returnTo: location.pathname + location.search,
+                                }}
                               >
                                 {invoice.referenceInvoiceNo ||
                                   `Invoice #${invoice.referenceInvoiceId}`}

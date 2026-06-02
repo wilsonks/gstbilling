@@ -1,9 +1,9 @@
 import React from "react";
-import DocumentCreateForm from "./components/DocumentCreateForm";
+import DocumentCreateModal from "./components/DocumentCreateModal";
 
 export default function CreditNoteCreatePage() {
   return (
-    <DocumentCreateForm
+    <DocumentCreateModal
       documentType="CREDIT_NOTE"
       title="Create Credit Note"
       description="Create a credit note against an existing tax invoice."
