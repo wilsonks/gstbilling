@@ -40,6 +40,11 @@ export async function cancelInvoice(id) {
   return response.data;
 }
 
+export async function convertProformaToTaxInvoice(id) {
+  const response = await api.post(`/api/invoices/${id}/convert-to-tax-invoice`);
+  return response.data;
+}
+
 export async function exportInvoicePdf(id) {
   const response = await api.get(`/api/invoices/${id}/export/pdf`, {
     responseType: "blob",

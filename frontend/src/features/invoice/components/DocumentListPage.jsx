@@ -79,6 +79,21 @@ function formatCurrency(value) {
   }).format(amount);
 }
 
+function statusColorScheme(status) {
+  switch (status) {
+    case "CANCELLED":
+      return "red";
+    case "ISSUED":
+      return "green";
+    case "CONVERTED":
+      return "purple";
+    case "EXPIRED":
+      return "orange";
+    default:
+      return "gray";
+  }
+}
+
 export default function DocumentListPage({
   title,
   description,
@@ -361,6 +376,8 @@ export default function DocumentListPage({
               >
                 <option value="">All statuses</option>
                 <option value="ISSUED">Issued</option>
+                <option value="EXPIRED">Expired</option>
+                <option value="CONVERTED">Converted</option>
                 <option value="CANCELLED">Cancelled</option>
                 <option value="DRAFT">Draft</option>
               </Input>
@@ -430,15 +447,7 @@ export default function DocumentListPage({
                           {formatCurrency(invoice.totalInvoiceAmount)}
                         </Td>
                         <Td>
-                          <Badge
-                            colorScheme={
-                              invoice.status === "CANCELLED"
-                                ? "red"
-                                : invoice.status === "ISSUED"
-                                  ? "green"
-                                  : "gray"
-                            }
-                          >
+                          <Badge colorScheme={statusColorScheme(invoice.status)}>
                             {invoice.status || "—"}
                           </Badge>
                         </Td>
@@ -466,16 +475,17 @@ export default function DocumentListPage({
                               onClick={() => handleDownloadPdf(invoice)}
                               isLoading={downloadingId === invoice.id}
                             />
-                            {invoice.status !== "CANCELLED" && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                colorScheme="red"
-                                onClick={() => handleCancelInvoice(invoice)}
-                              >
-                                Cancel
-                              </Button>
-                            )}
+                            {invoice.status !== "CANCELLED" &&
+                              !(invoice.documentType === "PROFORMA_INVOICE" && invoice.convertedToInvoiceId) && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  colorScheme="red"
+                                  onClick={() => handleCancelInvoice(invoice)}
+                                >
+                                  Cancel
+                                </Button>
+                              )}
                           </HStack>
                         </Td>
                       </Tr>

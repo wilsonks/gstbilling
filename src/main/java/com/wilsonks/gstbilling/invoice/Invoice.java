@@ -6,6 +6,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -43,6 +44,18 @@ public class Invoice extends TenantScopedEntity {
 
     @Column(name = "reference_invoice_no", length = 100)
     private String referenceInvoiceNo;
+
+    @Column(name = "source_proforma_id")
+    private Long sourceProformaId;
+
+    @Column(name = "converted_to_invoice_id")
+    private Long convertedToInvoiceId;
+
+    @Column(name = "converted_at")
+    private Instant convertedAt;
+
+    @Column(name = "valid_until")
+    private LocalDate validUntil;
 
     @Column(name = "invoice_no", nullable = false, length = 100)
     private String invoiceNo;

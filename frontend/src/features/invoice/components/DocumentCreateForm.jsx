@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  Alert,
+  AlertIcon,
   Box,
   Button,
   Card,
@@ -70,9 +72,15 @@ export default function DocumentCreateForm({
 
   const requiresReference =
     documentType === "CREDIT_NOTE" || documentType === "DEBIT_NOTE";
+  const isProforma = documentType === "PROFORMA_INVOICE";
+  const isTaxInvoice = documentType === "TAX_INVOICE";
 
   const prefilledReferenceInvoiceId = location.state?.referenceInvoiceId
     ? String(location.state.referenceInvoiceId)
+    : "";
+
+  const prefilledSourceProformaId = location.state?.sourceProformaId
+    ? String(location.state.sourceProformaId)
     : "";
 
   const [customers, setCustomers] = useState([]);
@@ -86,7 +94,9 @@ export default function DocumentCreateForm({
   const [form, setForm] = useState({
     customerId: "",
     referenceInvoiceId: prefilledReferenceInvoiceId,
+    sourceProformaId: prefilledSourceProformaId,
     invoiceDate: new Date().toISOString().slice(0, 10),
+    validUntil: "",
     notes: "",
     termsAndConditions: "Payment due within agreed credit period.",
     lines: [{ ...initialLine }],
@@ -113,7 +123,7 @@ export default function DocumentCreateForm({
         setCustomers(customerData || []);
         setProducts(productData || []);
 
-        if (!requiresReference && (customerData || []).length > 0) {
+        if (!requiresReference && !prefilledSourceProformaId && (customerData || []).length > 0) {
           setForm((prev) => ({
             ...prev,
             customerId: prev.customerId || String(customerData[0].id),
@@ -133,7 +143,7 @@ export default function DocumentCreateForm({
     };
 
     loadData();
-  }, [toast, requiresReference]);
+  }, [toast, requiresReference, prefilledSourceProformaId]);
 
   useEffect(() => {
     if (!requiresReference || !form.referenceInvoiceId) {
@@ -192,6 +202,59 @@ export default function DocumentCreateForm({
       ignore = true;
     };
   }, [requiresReference, form.referenceInvoiceId, documentType, toast]);
+
+  useEffect(() => {
+    if (!isTaxInvoice || !form.sourceProformaId) {
+      return;
+    }
+
+    let ignore = false;
+
+    const loadSourceProforma = async () => {
+      setLoadingReferenceInvoice(true);
+      try {
+        const proforma = await getInvoiceById(form.sourceProformaId);
+        if (ignore) return;
+
+        setForm((prev) => ({
+          ...prev,
+          customerId: proforma?.customerId ? String(proforma.customerId) : "",
+          lines:
+            (proforma?.lines || []).map((line) => ({
+              productId: line.productId ? String(line.productId) : "",
+              description: line.description || "",
+              quantity: Number(line.quantity || 0),
+              unitPrice: Number(line.unitPrice || 0),
+            })) || [{ ...initialLine }],
+          notes: prev.notes?.trim() ? prev.notes : proforma?.notes || "",
+          termsAndConditions:
+            prev.termsAndConditions?.trim()
+              ? prev.termsAndConditions
+              : proforma?.termsAndConditions || "",
+        }));
+      } catch (error) {
+        if (!ignore) {
+          toast({
+            title: "Failed to load source proforma",
+            description: error?.response?.data?.message || "Please try again.",
+            status: "error",
+            duration: 3000,
+            isClosable: true,
+          });
+        }
+      } finally {
+        if (!ignore) {
+          setLoadingReferenceInvoice(false);
+        }
+      }
+    };
+
+    loadSourceProforma();
+
+    return () => {
+      ignore = true;
+    };
+  }, [isTaxInvoice, form.sourceProformaId, toast]);
 
   const productsById = useMemo(() => {
     return new Map(products.map((product) => [String(product.id), product]));
@@ -329,6 +392,16 @@ export default function DocumentCreateForm({
       return false;
     }
 
+    if (isProforma && form.validUntil && form.validUntil < form.invoiceDate) {
+      toast({
+        title: "Valid until cannot be earlier than invoice date",
+        status: "warning",
+        duration: 2500,
+        isClosable: true,
+      });
+      return false;
+    }
+
     if (!form.lines.length) {
       toast({
         title: "At least one line item is required",
@@ -387,7 +460,12 @@ export default function DocumentCreateForm({
         referenceInvoiceId: requiresReference
           ? Number(form.referenceInvoiceId)
           : null,
+        sourceProformaId:
+          isTaxInvoice && form.sourceProformaId
+            ? Number(form.sourceProformaId)
+            : null,
         invoiceDate: form.invoiceDate,
+        validUntil: isProforma ? form.validUntil || null : null,
         notes: form.notes?.trim() || null,
         termsAndConditions: form.termsAndConditions?.trim() || null,
         lines: form.lines.map((line) => ({
@@ -408,7 +486,13 @@ export default function DocumentCreateForm({
         isClosable: true,
       });
 
-      navigate(resolveDocumentDetailPath(created));
+      navigate(resolveDocumentDetailPath(created), {
+        state: {
+          backgroundLocation: location.state?.backgroundLocation || location,
+          returnTo:
+            location.state?.returnTo || resolveDocumentListPath(documentType),
+        },
+      });
     } catch (error) {
       toast({
         title: "Failed to create document",
@@ -476,6 +560,20 @@ export default function DocumentCreateForm({
               </Box>
             )}
 
+            {isProforma && (
+              <Alert status="info" borderRadius="md">
+                <AlertIcon />
+                Proforma invoices can include a validity date and can later be converted to a tax invoice.
+              </Alert>
+            )}
+
+            {isTaxInvoice && form.sourceProformaId && (
+              <Alert status="success" borderRadius="md">
+                <AlertIcon />
+                This tax invoice will be linked to source proforma #{form.sourceProformaId}.
+              </Alert>
+            )}
+
             {requiresReference && (
               <Stack spacing={4}>
                 <Box>
@@ -520,7 +618,7 @@ export default function DocumentCreateForm({
                 <CustomerSelect
                   value={form.customerId}
                   onChange={(value) => handleHeaderChange("customerId", value)}
-                  isDisabled={loading || saving || requiresReference}
+                  isDisabled={loading || saving || requiresReference || !!form.sourceProformaId}
                 />
               </Box>
 
@@ -536,6 +634,20 @@ export default function DocumentCreateForm({
                 />
               </Box>
             </Grid>
+
+            {isProforma && (
+              <Box maxW={{ base: "100%", md: "320px" }}>
+                <Text fontSize="sm" color="gray.600" mb={2}>
+                  Valid Until
+                </Text>
+                <Input
+                  type="date"
+                  value={form.validUntil}
+                  onChange={(e) => handleHeaderChange("validUntil", e.target.value)}
+                  isDisabled={loading || saving}
+                />
+              </Box>
+            )}
 
             {selectedCustomer && (
               <Box borderWidth="1px" borderColor="blue.100" bg="blue.50" borderRadius="md" p={4}>

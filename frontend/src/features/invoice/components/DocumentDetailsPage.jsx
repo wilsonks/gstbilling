@@ -27,6 +27,7 @@ import { ArrowLeft, Download, Printer } from "lucide-react";
 import { Link as RouterLink, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   cancelInvoice,
+  convertProformaToTaxInvoice,
   exportInvoicePdf,
   getInvoiceById,
   previewInvoicePdf,
@@ -49,6 +50,15 @@ function formatDate(value) {
   if (!value) return "—";
   try {
     return new Date(value).toLocaleDateString("en-IN");
+  } catch {
+    return value;
+  }
+}
+
+function formatDateTime(value) {
+  if (!value) return "—";
+  try {
+    return new Date(value).toLocaleString("en-IN");
   } catch {
     return value;
   }
@@ -90,6 +100,21 @@ function resolveDetailPath(documentType, id) {
   }
 }
 
+function statusColorScheme(status) {
+  switch (status) {
+    case "CANCELLED":
+      return "red";
+    case "ISSUED":
+      return "green";
+    case "CONVERTED":
+      return "purple";
+    case "EXPIRED":
+      return "orange";
+    default:
+      return "gray";
+  }
+}
+
 export default function DocumentDetailsPage({
   expectedDocumentType,
   title,
@@ -105,6 +130,7 @@ export default function DocumentDetailsPage({
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [converting, setConverting] = useState(false);
 
   const handleBack = () => {
     if (embedded && onClose) {
@@ -186,6 +212,40 @@ export default function DocumentDetailsPage({
     }
   };
 
+  const handleConvertToTaxInvoice = async () => {
+    if (!invoice?.id) return;
+
+    setConverting(true);
+    try {
+      const converted = await convertProformaToTaxInvoice(invoice.id);
+
+      toast({
+        title: "Converted to tax invoice",
+        description: `${converted.invoiceNo || "Tax invoice"} created successfully.`,
+        status: "success",
+        duration: 2500,
+        isClosable: true,
+      });
+
+      navigate(resolveDetailPath(converted.documentType, converted.id), {
+        state: {
+          backgroundLocation: location.state?.backgroundLocation || location,
+          returnTo: resolveDetailPath(invoice.documentType, invoice.id),
+        },
+      });
+    } catch (error) {
+      toast({
+        title: "Failed to convert proforma invoice",
+        description: error?.response?.data?.message || "Please try again.",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+    } finally {
+      setConverting(false);
+    }
+  };
+
   const handleCreateCreditNote = () => {
     if (!invoice?.id) return;
     navigate("/credit-notes/new", {
@@ -258,9 +318,23 @@ export default function DocumentDetailsPage({
   const isNote =
     invoice?.documentType === "CREDIT_NOTE" ||
     invoice?.documentType === "DEBIT_NOTE";
+  const isProforma = invoice?.documentType === "PROFORMA_INVOICE";
+  const isTaxInvoice = invoice?.documentType === "TAX_INVOICE";
+
   const canCreateNotes =
-    invoice?.documentType === "TAX_INVOICE" &&
+    isTaxInvoice &&
     invoice?.status !== "CANCELLED";
+
+  const canConvertProforma =
+    isProforma &&
+    invoice?.status !== "CANCELLED" &&
+    invoice?.status !== "CONVERTED" &&
+    invoice?.status !== "EXPIRED" &&
+    !invoice?.convertedToInvoiceId;
+
+  const canCancel =
+    invoice?.status !== "CANCELLED" &&
+    !(isProforma && invoice?.convertedToInvoiceId);
 
   const handleDownloadPdf = async () => {
     if (!invoice?.id) return;
@@ -334,6 +408,17 @@ export default function DocumentDetailsPage({
           </Box>
 
           <HStack spacing={3} flexWrap="wrap">
+            {canConvertProforma && (
+              <Button
+                colorScheme="blue"
+                variant="outline"
+                onClick={handleConvertToTaxInvoice}
+                isLoading={converting}
+              >
+                Convert to Tax Invoice
+              </Button>
+            )}
+
             {canCreateNotes && (
               <>
                 <Button variant="outline" colorScheme="teal" onClick={handleCreateCreditNote}>
@@ -361,7 +446,7 @@ export default function DocumentDetailsPage({
             >
               Download PDF
             </Button>
-            {invoice.status !== "CANCELLED" && (
+            {canCancel && (
               <Button
                 colorScheme="red"
                 variant="outline"
@@ -378,6 +463,17 @@ export default function DocumentDetailsPage({
       {embedded && (
         <Flex justify="flex-end">
           <HStack spacing={3} flexWrap="wrap">
+            {canConvertProforma && (
+              <Button
+                colorScheme="blue"
+                variant="outline"
+                onClick={handleConvertToTaxInvoice}
+                isLoading={converting}
+              >
+                Convert to Tax Invoice
+              </Button>
+            )}
+
             {canCreateNotes && (
               <>
                 <Button variant="outline" colorScheme="teal" onClick={handleCreateCreditNote}>
@@ -405,7 +501,7 @@ export default function DocumentDetailsPage({
             >
               Download PDF
             </Button>
-            {invoice.status !== "CANCELLED" && (
+            {canCancel && (
               <Button
                 colorScheme="red"
                 variant="outline"
@@ -438,20 +534,64 @@ export default function DocumentDetailsPage({
                 <Text color="gray.500" mt={1}>
                   Date: {formatDate(invoice.invoiceDate)}
                 </Text>
+                {isProforma && (
+                  <Text color="gray.500" mt={1}>
+                    Valid Until: {formatDate(invoice.validUntil)}
+                  </Text>
+                )}
               </Box>
 
-              <Badge
-                colorScheme={
-                  invoice.status === "CANCELLED"
-                    ? "red"
-                    : invoice.status === "ISSUED"
-                    ? "green"
-                    : "gray"
-                }
-              >
+              <Badge colorScheme={statusColorScheme(invoice.status)}>
                 {invoice.status || "—"}
               </Badge>
             </Flex>
+
+            {isProforma && invoice.convertedToInvoiceId && (
+              <Card variant="outline">
+                <CardBody>
+                  <Stack spacing={2}>
+                    <Heading size="sm">Converted Tax Invoice</Heading>
+                    <ChakraLink
+                      as={RouterLink}
+                      to={`/invoices/${invoice.convertedToInvoiceId}`}
+                      color="blue.600"
+                      fontWeight="600"
+                      state={{
+                        backgroundLocation: location.state?.backgroundLocation || location,
+                        returnTo: resolveDetailPath(invoice.documentType, invoice.id),
+                      }}
+                    >
+                      View Tax Invoice #{invoice.convertedToInvoiceId}
+                    </ChakraLink>
+                    <Text fontSize="sm" color="gray.600">
+                      Converted At: {formatDateTime(invoice.convertedAt)}
+                    </Text>
+                  </Stack>
+                </CardBody>
+              </Card>
+            )}
+
+            {isTaxInvoice && invoice.sourceProformaId && (
+              <Card variant="outline">
+                <CardBody>
+                  <Stack spacing={2}>
+                    <Heading size="sm">Source Proforma Invoice</Heading>
+                    <ChakraLink
+                      as={RouterLink}
+                      to={`/proforma-invoices/${invoice.sourceProformaId}`}
+                      color="blue.600"
+                      fontWeight="600"
+                      state={{
+                        backgroundLocation: location.state?.backgroundLocation || location,
+                        returnTo: resolveDetailPath(invoice.documentType, invoice.id),
+                      }}
+                    >
+                      View Proforma #{invoice.sourceProformaId}
+                    </ChakraLink>
+                  </Stack>
+                </CardBody>
+              </Card>
+            )}
 
             {isNote && invoice.referenceInvoiceId && (
               <Card variant="outline">
@@ -506,6 +646,12 @@ export default function DocumentDetailsPage({
                     <Text color="gray.500">Due Date</Text>
                     <Text fontWeight="600">{formatDate(invoice.dueDate)}</Text>
                   </Flex>
+                  {isProforma && (
+                    <Flex justify="space-between">
+                      <Text color="gray.500">Valid Until</Text>
+                      <Text fontWeight="600">{formatDate(invoice.validUntil)}</Text>
+                    </Flex>
+                  )}
                   <Flex justify="space-between">
                     <Text color="gray.500">Tax Type</Text>
                     <Text fontWeight="600">{invoice.taxType || "—"}</Text>

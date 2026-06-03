@@ -17,6 +17,12 @@ public class InvoiceDto {
     private DocumentType documentType;
     private Long referenceInvoiceId;
     private String referenceInvoiceNo;
+
+    private Long sourceProformaId;
+    private Long convertedToInvoiceId;
+    private Instant convertedAt;
+    private LocalDate validUntil;
+
     private String invoiceNo;
     private LocalDate invoiceDate;
     private LocalDate dueDate;

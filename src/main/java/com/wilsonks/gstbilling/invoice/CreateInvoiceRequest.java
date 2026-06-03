@@ -11,7 +11,9 @@ public class CreateInvoiceRequest {
     private Long customerId;
     private DocumentType documentType;
     private Long referenceInvoiceId;
+    private Long sourceProformaId;
     private LocalDate invoiceDate;
+    private LocalDate validUntil;
     private String notes;
     private String termsAndConditions;
     private List<CreateInvoiceLineRequest> lines;

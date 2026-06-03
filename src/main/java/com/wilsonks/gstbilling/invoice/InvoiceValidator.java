@@ -35,6 +35,18 @@ public class InvoiceValidator {
             throw new IllegalArgumentException("Reference invoice is not allowed for tax invoice or proforma invoice");
         }
 
+        if (documentType != DocumentType.PROFORMA_INVOICE && request.getValidUntil() != null) {
+            throw new IllegalArgumentException("Valid until is only allowed for proforma invoice");
+        }
+
+        if (documentType == DocumentType.PROFORMA_INVOICE && request.getSourceProformaId() != null) {
+            throw new IllegalArgumentException("Proforma invoice cannot reference a source proforma");
+        }
+
+        if (documentType != DocumentType.TAX_INVOICE && request.getSourceProformaId() != null) {
+            throw new IllegalArgumentException("Source proforma is only allowed for tax invoice");
+        }
+
         if (request.getLines() == null || request.getLines().isEmpty()) {
             throw new IllegalArgumentException("At least one invoice line is required");
         }

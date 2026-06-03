@@ -23,6 +23,11 @@ public class InvoiceController {
         return service.create(request);
     }
 
+    @PostMapping("/{id}/convert-to-tax-invoice")
+    public InvoiceDto convertToTaxInvoice(@PathVariable Long id) {
+        return service.convertToTaxInvoice(id);
+    }
+
     @GetMapping("/{id}")
     public InvoiceDto getById(@PathVariable Long id) {
         return service.getById(id);

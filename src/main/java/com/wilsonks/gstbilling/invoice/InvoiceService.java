@@ -24,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -60,6 +61,47 @@ public class InvoiceService {
         return createInternal(tenantId, companyId, request, true);
     }
 
+    @Transactional
+    public InvoiceDto convertToTaxInvoice(Long id) {
+        Long tenantId = getTenantIdOrThrow();
+        Long companyId = getCompanyIdOrThrow();
+
+        Invoice proforma = repo.findByIdAndTenantIdAndCompanyId(id, tenantId, companyId)
+                .orElseThrow(() -> new IllegalArgumentException("Invoice not found: " + id));
+
+        validateProformaConvertible(proforma);
+
+        CreateInvoiceRequest request = new CreateInvoiceRequest();
+        request.setCustomerId(proforma.getCustomerId());
+        request.setDocumentType(DocumentType.TAX_INVOICE);
+        request.setReferenceInvoiceId(null);
+        request.setSourceProformaId(proforma.getId());
+        request.setInvoiceDate(LocalDate.now());
+        request.setValidUntil(null);
+        request.setNotes(proforma.getNotes());
+        request.setTermsAndConditions(proforma.getTermsAndConditions());
+
+        List<CreateInvoiceLineRequest> lineRequests = new ArrayList<>();
+        for (InvoiceLine line : proforma.getLines()) {
+            CreateInvoiceLineRequest lineRequest = new CreateInvoiceLineRequest();
+            lineRequest.setProductId(line.getProductId());
+            lineRequest.setDescription(line.getDescription());
+            lineRequest.setQuantity(line.getQuantity());
+            lineRequest.setUnitPrice(line.getUnitPrice());
+            lineRequests.add(lineRequest);
+        }
+        request.setLines(lineRequests);
+
+        InvoiceDto converted = createInternal(tenantId, companyId, request, false);
+
+        proforma.setStatus(InvoiceStatus.CONVERTED);
+        proforma.setConvertedToInvoiceId(converted.getId());
+        proforma.setConvertedAt(Instant.now());
+        repo.save(proforma);
+
+        return converted;
+    }
+
     private InvoiceDto createInternal(Long tenantId, Long companyId, CreateInvoiceRequest request, boolean seedMode) {
         validator.validateForCreate(request);
 
@@ -87,8 +129,18 @@ public class InvoiceService {
                 request.getReferenceInvoiceId()
         );
 
+        Invoice sourceProforma = resolveAndValidateSourceProforma(
+                tenantId,
+                companyId,
+                customer.getId(),
+                documentType,
+                request.getSourceProformaId()
+        );
+
         TaxType taxType = referenceInvoice != null
                 ? referenceInvoice.getTaxType()
+                : sourceProforma != null
+                ? sourceProforma.getTaxType()
                 : resolveTaxType(company.getStateCode(), customer.getBillingStateCode(), customer.getGstin());
 
         NextSequenceNumberDto nextSequence = seedMode
@@ -101,6 +153,10 @@ public class InvoiceService {
         invoice.setDocumentType(documentType);
         invoice.setReferenceInvoiceId(referenceInvoice != null ? referenceInvoice.getId() : null);
         invoice.setReferenceInvoiceNo(referenceInvoice != null ? referenceInvoice.getInvoiceNo() : null);
+        invoice.setSourceProformaId(sourceProforma != null ? sourceProforma.getId() : null);
+        invoice.setConvertedToInvoiceId(null);
+        invoice.setConvertedAt(null);
+        invoice.setValidUntil(documentType == DocumentType.PROFORMA_INVOICE ? request.getValidUntil() : null);
         invoice.setInvoiceNo(nextSequence.getFormattedNumber());
         invoice.setInvoiceDate(request.getInvoiceDate());
         invoice.setDueDate(resolveDueDate(request.getInvoiceDate(), customer.getPaymentTermsDays()));
@@ -222,6 +278,11 @@ public class InvoiceService {
         Invoice invoice = repo.findByIdAndTenantIdAndCompanyId(id, tenantId, companyId)
                 .orElseThrow(() -> new IllegalArgumentException("Invoice not found: " + id));
 
+        if (invoice.getDocumentType() == DocumentType.PROFORMA_INVOICE
+                && invoice.getConvertedToInvoiceId() != null) {
+            throw new IllegalArgumentException("Converted proforma invoice cannot be cancelled");
+        }
+
         if (invoice.getStatus() == InvoiceStatus.CANCELLED) {
             return toDto(invoice);
         }
@@ -269,6 +330,75 @@ public class InvoiceService {
         }
 
         return referenceInvoice;
+    }
+
+    private Invoice resolveAndValidateSourceProforma(
+            Long tenantId,
+            Long companyId,
+            Long customerId,
+            DocumentType documentType,
+            Long sourceProformaId
+    ) {
+        if (documentType != DocumentType.TAX_INVOICE || sourceProformaId == null) {
+            return null;
+        }
+
+        Invoice sourceProforma = repo.findByIdAndTenantIdAndCompanyId(sourceProformaId, tenantId, companyId)
+                .orElseThrow(() -> new IllegalArgumentException("Source proforma not found: " + sourceProformaId));
+
+        if (sourceProforma.getDocumentType() != DocumentType.PROFORMA_INVOICE) {
+            throw new IllegalArgumentException("Source document must be a proforma invoice");
+        }
+
+        if (!customerId.equals(sourceProforma.getCustomerId())) {
+            throw new IllegalArgumentException("Source proforma customer must match selected customer");
+        }
+
+        if (sourceProforma.getStatus() == InvoiceStatus.CANCELLED) {
+            throw new IllegalArgumentException("Cancelled proforma invoice cannot be converted");
+        }
+
+        if (sourceProforma.getStatus() == InvoiceStatus.CONVERTED || sourceProforma.getConvertedToInvoiceId() != null) {
+            throw new IllegalArgumentException("Proforma invoice has already been converted");
+        }
+
+        if (isProformaExpired(sourceProforma)) {
+            throw new IllegalArgumentException("Expired proforma invoice cannot be converted");
+        }
+
+        return sourceProforma;
+    }
+
+    private void validateProformaConvertible(Invoice invoice) {
+        if (invoice.getDocumentType() != DocumentType.PROFORMA_INVOICE) {
+            throw new IllegalArgumentException("Only proforma invoices can be converted");
+        }
+
+        if (invoice.getStatus() == InvoiceStatus.CANCELLED) {
+            throw new IllegalArgumentException("Cancelled proforma invoice cannot be converted");
+        }
+
+        if (invoice.getStatus() == InvoiceStatus.CONVERTED || invoice.getConvertedToInvoiceId() != null) {
+            throw new IllegalArgumentException("Proforma invoice has already been converted");
+        }
+
+        if (isProformaExpired(invoice)) {
+            throw new IllegalArgumentException("Expired proforma invoice cannot be converted");
+        }
+    }
+
+    private boolean isProformaExpired(Invoice invoice) {
+        return invoice.getDocumentType() == DocumentType.PROFORMA_INVOICE
+                && invoice.getStatus() == InvoiceStatus.ISSUED
+                && invoice.getValidUntil() != null
+                && invoice.getValidUntil().isBefore(LocalDate.now());
+    }
+
+    private InvoiceStatus resolveStatus(Invoice invoice) {
+        if (isProformaExpired(invoice)) {
+            return InvoiceStatus.EXPIRED;
+        }
+        return invoice.getStatus();
     }
 
     private Long getTenantIdOrThrow() {
@@ -412,10 +542,16 @@ public class InvoiceService {
         dto.setDocumentType(invoice.getDocumentType());
         dto.setReferenceInvoiceId(invoice.getReferenceInvoiceId());
         dto.setReferenceInvoiceNo(invoice.getReferenceInvoiceNo());
+
+        dto.setSourceProformaId(invoice.getSourceProformaId());
+        dto.setConvertedToInvoiceId(invoice.getConvertedToInvoiceId());
+        dto.setConvertedAt(invoice.getConvertedAt());
+        dto.setValidUntil(invoice.getValidUntil());
+
         dto.setInvoiceNo(invoice.getInvoiceNo());
         dto.setInvoiceDate(invoice.getInvoiceDate());
         dto.setDueDate(invoice.getDueDate());
-        dto.setStatus(invoice.getStatus());
+        dto.setStatus(resolveStatus(invoice));
         dto.setTaxType(invoice.getTaxType());
         dto.setPlaceOfSupplyStateCode(invoice.getPlaceOfSupplyStateCode());
         dto.setNotes(invoice.getNotes());
