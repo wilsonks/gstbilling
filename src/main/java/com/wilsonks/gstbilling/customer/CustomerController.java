@@ -1,9 +1,14 @@
 package com.wilsonks.gstbilling.customer;
 
+import com.wilsonks.gstbilling.customer.imports.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -13,6 +18,9 @@ import java.util.List;
 public class CustomerController {
 
     private final CustomerService service;
+    private final CustomerImportService importService;
+    private final CustomerExportService exportService;
+    private final CustomerTemplateService templateService;
 
     @PostMapping
     public CustomerDto create(@RequestBody CustomerDto dto) {
@@ -55,5 +63,54 @@ public class CustomerController {
     @PostMapping("/{id}/reactivate")
     public CustomerDto reactivate(@PathVariable Long id) {
         return service.reactivate(id);
+    }
+
+
+    @PostMapping("/import/validate")
+    public CustomerImportValidationResult validateImport(
+            @RequestParam("file")
+            MultipartFile file) {
+
+        return importService.validate(file);
+    }
+
+    @PostMapping("/import/commit")
+    public CustomerImportCommitResult commitImport(
+            @RequestParam("file")
+            MultipartFile file) {
+
+        return importService.commit(file);
+    }
+
+    @GetMapping("/export")
+    public ResponseEntity<byte[]> export() {
+
+        byte[] file =
+                exportService.export();
+
+        return ResponseEntity.ok()
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=customers.xlsx")
+                .contentType(
+                        MediaType.parseMediaType(
+                                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(file);
+    }
+
+    @GetMapping("/template")
+    public ResponseEntity<byte[]> template() {
+
+        byte[] file =
+                templateService.generateTemplate();
+
+        return ResponseEntity.ok()
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=customer-template.xlsx")
+                .contentType(
+                        MediaType.parseMediaType(
+                                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(file);
     }
 }

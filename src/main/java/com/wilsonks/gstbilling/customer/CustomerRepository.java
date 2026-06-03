@@ -34,4 +34,14 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
     long countByTenantIdAndActiveTrue(Long tenantId);
 
     List<Customer> findTop5ByTenantIdOrderByUpdatedAtDesc(Long tenantId);
+
+
+    // For imports validation
+    Optional<Customer> findByIdAndTenantId(
+            Long id,
+            Long tenantId);
+
+    Optional<Customer> findByTenantIdAndGstinIgnoreCase(
+            Long tenantId,
+            String gstin);
 }
