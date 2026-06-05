@@ -28,18 +28,38 @@ import {
   useDisclosure,
   useToast,
 } from "@chakra-ui/react";
-import { Edit, Plus, Power, RefreshCw, Users } from "lucide-react";
+import {
+  Edit,
+  Plus,
+  Power,
+  RefreshCw,
+  Users,
+  Download,
+  Upload,
+  FileSpreadsheet,
+} from "lucide-react";
 import CustomerFormModal from "./CustomerFormModal";
 import {
   deactivateCustomer,
   getCustomerStats,
   getMyCustomers,
   reactivateCustomer,
+  downloadCustomerTemplate,
+  exportCustomers,
+  validateCustomerImport,
+  commitCustomerImport,
 } from "./customerApi";
+
+import { downloadBlob } from "../../utils/fileDownload";
 
 function MetricCard({ label, value, helpText, loading = false }) {
   return (
-    <Card borderWidth="1px" borderColor="gray.200" shadow="sm" borderRadius="xl">
+    <Card
+      borderWidth="1px"
+      borderColor="gray.200"
+      shadow="sm"
+      borderRadius="xl"
+    >
       <CardBody>
         <Stat>
           <StatLabel color="gray.500">{label}</StatLabel>
@@ -58,6 +78,18 @@ function MetricCard({ label, value, helpText, loading = false }) {
 export default function CustomerPage() {
   const toast = useToast();
   const { isOpen, onOpen, onClose } = useDisclosure();
+
+  const fileInputRef = React.useRef(null);
+
+  const [importFile, setImportFile] = useState(null);
+
+  const [validatingImport, setValidatingImport] = useState(false);
+
+  const [committingImport, setCommittingImport] = useState(false);
+
+  const [importResult, setImportResult] = useState(null);
+
+  const [commitResult, setCommitResult] = useState(null);
 
   const [customers, setCustomers] = useState([]);
   const [stats, setStats] = useState({
@@ -97,7 +129,7 @@ export default function CustomerPage() {
           active: 0,
           inactive: 0,
           recentCustomers: [],
-        }
+        },
       );
     } catch (error) {
       toast({
@@ -121,11 +153,17 @@ export default function CustomerPage() {
   }, []);
 
   const customerTypeOptions = useMemo(() => {
-    return [...new Set(customers.map((item) => item.customerType).filter(Boolean))].sort();
+    return [
+      ...new Set(customers.map((item) => item.customerType).filter(Boolean)),
+    ].sort();
   }, [customers]);
 
   const gstTypeOptions = useMemo(() => {
-    return [...new Set(customers.map((item) => item.gstRegistrationType).filter(Boolean))].sort();
+    return [
+      ...new Set(
+        customers.map((item) => item.gstRegistrationType).filter(Boolean),
+      ),
+    ].sort();
   }, [customers]);
 
   const filteredCustomers = useMemo(() => {
@@ -134,14 +172,30 @@ export default function CustomerPage() {
     return customers.filter((customer) => {
       const matchesQuery =
         !q ||
-        String(customer.code || "").toLowerCase().includes(q) ||
-        String(customer.legalName || "").toLowerCase().includes(q) ||
-        String(customer.tradeName || "").toLowerCase().includes(q) ||
-        String(customer.gstin || "").toLowerCase().includes(q) ||
-        String(customer.pan || "").toLowerCase().includes(q) ||
-        String(customer.contactPerson || "").toLowerCase().includes(q) ||
-        String(customer.email || "").toLowerCase().includes(q) ||
-        String(customer.phone || "").toLowerCase().includes(q);
+        String(customer.code || "")
+          .toLowerCase()
+          .includes(q) ||
+        String(customer.legalName || "")
+          .toLowerCase()
+          .includes(q) ||
+        String(customer.tradeName || "")
+          .toLowerCase()
+          .includes(q) ||
+        String(customer.gstin || "")
+          .toLowerCase()
+          .includes(q) ||
+        String(customer.pan || "")
+          .toLowerCase()
+          .includes(q) ||
+        String(customer.contactPerson || "")
+          .toLowerCase()
+          .includes(q) ||
+        String(customer.email || "")
+          .toLowerCase()
+          .includes(q) ||
+        String(customer.phone || "")
+          .toLowerCase()
+          .includes(q);
 
       const matchesStatus =
         !statusFilter ||
@@ -149,12 +203,16 @@ export default function CustomerPage() {
         (statusFilter === "INACTIVE" && !customer.active);
 
       const matchesCustomerType =
-        !customerTypeFilter || String(customer.customerType || "") === customerTypeFilter;
+        !customerTypeFilter ||
+        String(customer.customerType || "") === customerTypeFilter;
 
       const matchesGstType =
-        !gstTypeFilter || String(customer.gstRegistrationType || "") === gstTypeFilter;
+        !gstTypeFilter ||
+        String(customer.gstRegistrationType || "") === gstTypeFilter;
 
-      return matchesQuery && matchesStatus && matchesCustomerType && matchesGstType;
+      return (
+        matchesQuery && matchesStatus && matchesCustomerType && matchesGstType
+      );
     });
   }, [customers, query, statusFilter, customerTypeFilter, gstTypeFilter]);
 
@@ -182,7 +240,9 @@ export default function CustomerPage() {
       }
 
       toast({
-        title: customer.active ? "Customer deactivated" : "Customer reactivated",
+        title: customer.active
+          ? "Customer deactivated"
+          : "Customer reactivated",
         status: "success",
         duration: 2500,
         isClosable: true,
@@ -200,6 +260,133 @@ export default function CustomerPage() {
     }
   };
 
+  const handleDownloadTemplate = async () => {
+    try {
+      const blob = await downloadCustomerTemplate();
+
+      downloadBlob(blob, "customer-template.xlsx");
+    } catch (error) {
+      toast({
+        title: "Failed to download template",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  };
+
+  const handleExport = async () => {
+    try {
+      const blob = await exportCustomers();
+
+      downloadBlob(blob, "customers.xlsx");
+    } catch (error) {
+      toast({
+        title: "Failed to export customers",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  };
+
+  const handleValidateImport = async () => {
+    setCommitResult(null);
+
+    if (!importFile) {
+      toast({
+        title: "Choose an Excel file first",
+        status: "warning",
+        duration: 2000,
+        isClosable: true,
+      });
+
+      return;
+    }
+
+    setValidatingImport(true);
+
+    try {
+      const result = await validateCustomerImport(importFile);
+
+      setImportResult(result);
+
+      toast({
+        title: result.valid ? "Validation Passed" : "Validation Failed",
+        status: result.valid ? "success" : "warning",
+        duration: 3000,
+        isClosable: true,
+      });
+    } catch (error) {
+      toast({
+        title: "Validation failed",
+        description: error?.response?.data?.message,
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+    } finally {
+      setValidatingImport(false);
+    }
+  };
+
+  const handleCommitImport = async () => {
+    if (!importFile) {
+      return;
+    }
+
+    setCommittingImport(true);
+
+    try {
+      const result = await commitCustomerImport(importFile);
+
+      toast({
+        title:
+          result.failed > 0
+            ? "Import completed with errors"
+            : "Import completed",
+        description:
+          `${result.inserted} inserted, ` +
+          `${result.updated} updated, ` +
+          `${result.failed} failed`,
+        status: result.failed > 0 ? "warning" : "success",
+        duration: 6000,
+        isClosable: true,
+      });
+
+      setImportResult(null);
+      setImportFile(null);
+      setCommitResult(result);
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+
+      await loadPageData({
+        silent: true,
+      });
+    } catch (error) {
+      toast({
+        title: "Import failed",
+        description: error?.response?.data?.message,
+        status: "error",
+        duration: 4000,
+        isClosable: true,
+      });
+    } finally {
+      setCommittingImport(false);
+    }
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0] ?? null;
+
+    setImportFile(file);
+
+    setImportResult(null);
+    setCommitResult(null);
+  };
+
   return (
     <Stack spacing={6}>
       <Flex
@@ -211,11 +398,27 @@ export default function CustomerPage() {
         <Box>
           <Heading size="lg">Customers</Heading>
           <Text color="gray.500" mt={1}>
-            Manage invoice-ready customer profiles with GST, address, and payment terms.
+            Manage invoice-ready customer profiles with GST, address, and
+            payment terms.
           </Text>
         </Box>
 
         <HStack spacing={3}>
+          <Button
+            leftIcon={<FileSpreadsheet size={16} />}
+            variant="outline"
+            onClick={handleDownloadTemplate}
+          >
+            Template
+          </Button>
+
+          <Button
+            leftIcon={<Download size={16} />}
+            variant="outline"
+            onClick={handleExport}
+          >
+            Export
+          </Button>
           <Button
             leftIcon={<RefreshCw size={16} />}
             variant="outline"
@@ -225,7 +428,11 @@ export default function CustomerPage() {
             Refresh
           </Button>
 
-          <Button leftIcon={<Plus size={16} />} colorScheme="blue" onClick={handleCreate}>
+          <Button
+            leftIcon={<Plus size={16} />}
+            colorScheme="blue"
+            onClick={handleCreate}
+          >
             New Customer
           </Button>
         </HStack>
@@ -252,7 +459,124 @@ export default function CustomerPage() {
         />
       </SimpleGrid>
 
-      <Card borderWidth="1px" borderColor="gray.200" shadow="sm" borderRadius="xl">
+      <Card>
+        <CardBody>
+          <Stack spacing={4}>
+            <Heading size="sm">Customer Import</Heading>
+
+            <Input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx"
+              onChange={handleFileChange}
+            />
+
+            <HStack>
+              <Button
+                leftIcon={<Upload size={16} />}
+                onClick={handleValidateImport}
+                isLoading={validatingImport}
+              >
+                Validate
+              </Button>
+
+              <Button
+                colorScheme="green"
+                onClick={handleCommitImport}
+                isLoading={committingImport}
+                isDisabled={!importResult?.valid}
+              >
+                Commit
+              </Button>
+            </HStack>
+          </Stack>
+        </CardBody>
+      </Card>
+
+      {importResult?.errors?.length > 0 && (
+        <Card>
+          <CardBody>
+            <Stack spacing={2}>
+              <Heading size="sm">Validation Errors</Heading>
+
+              {importResult.errors.map((error, index) => (
+                <Box key={index} p={2} borderWidth="1px" borderRadius="md">
+                  <Text fontWeight="600">Row {error.rowNumber}</Text>
+
+                  <Text>Column: {error.column}</Text>
+
+                  {error.value && <Text>Value: {error.value}</Text>}
+
+                  <Text color="red.500">{error.message}</Text>
+                </Box>
+              ))}
+            </Stack>
+          </CardBody>
+        </Card>
+      )}
+
+      {importResult && (
+        <Box p={3} borderWidth="1px" borderRadius="md">
+          <Text>Total Rows: {importResult.totalRows}</Text>
+          <Text>Valid Rows: {importResult.validRows}</Text>
+          <Text>Invalid Rows: {importResult.invalidRows}</Text>
+        </Box>
+      )}
+
+      {commitResult?.errors?.length > 0 && (
+        <Card>
+          <CardBody>
+            <Stack spacing={2}>
+              <Heading size="sm">Commit Errors</Heading>
+
+              {commitResult.errors.map((error, index) => (
+                <Box key={index} p={2} borderWidth="1px" borderRadius="md">
+                  <Text fontWeight="600">Row {error.rowNumber}</Text>
+
+                  <Text>{error.message}</Text>
+                </Box>
+              ))}
+            </Stack>
+          </CardBody>
+        </Card>
+      )}
+
+      {commitResult && (
+        <Card>
+          <CardBody>
+            <Stack spacing={2}>
+              <Heading size="sm">Import Summary</Heading>
+
+              <Text>
+                Total Rows:
+                {commitResult.totalRows}
+              </Text>
+
+              <Text color="green.600">
+                Inserted:
+                {commitResult.inserted}
+              </Text>
+
+              <Text color="blue.600">
+                Updated:
+                {commitResult.updated}
+              </Text>
+
+              <Text color="red.600">
+                Failed:
+                {commitResult.failed}
+              </Text>
+            </Stack>
+          </CardBody>
+        </Card>
+      )}
+
+      <Card
+        borderWidth="1px"
+        borderColor="gray.200"
+        shadow="sm"
+        borderRadius="xl"
+      >
         <CardBody>
           <Stack spacing={4}>
             <SimpleGrid columns={{ base: 1, lg: 4 }} spacing={3}>
@@ -347,7 +671,9 @@ export default function CustomerPage() {
 
                         <Td>
                           <Stack spacing={0}>
-                            <Text fontWeight="600">{customer.gstin || "—"}</Text>
+                            <Text fontWeight="600">
+                              {customer.gstin || "—"}
+                            </Text>
                             <Text fontSize="xs" color="gray.500">
                               {customer.pan || "—"}
                             </Text>
@@ -365,9 +691,15 @@ export default function CustomerPage() {
 
                         <Td>
                           <Stack spacing={0}>
-                            <Text>{customer.customerType?.replaceAll("_", " ") || "—"}</Text>
+                            <Text>
+                              {customer.customerType?.replaceAll("_", " ") ||
+                                "—"}
+                            </Text>
                             <Text fontSize="xs" color="gray.500">
-                              {customer.gstRegistrationType?.replaceAll("_", " ") || "—"}
+                              {customer.gstRegistrationType?.replaceAll(
+                                "_",
+                                " ",
+                              ) || "—"}
                             </Text>
                           </Stack>
                         </Td>
@@ -384,7 +716,9 @@ export default function CustomerPage() {
                         <Td isNumeric>{customer.paymentTermsDays ?? 0} days</Td>
 
                         <Td>
-                          <Badge colorScheme={customer.active ? "green" : "gray"}>
+                          <Badge
+                            colorScheme={customer.active ? "green" : "gray"}
+                          >
                             {customer.active ? "ACTIVE" : "INACTIVE"}
                           </Badge>
                         </Td>
@@ -403,7 +737,11 @@ export default function CustomerPage() {
                               variant="outline"
                               colorScheme={customer.active ? "red" : "green"}
                               icon={<Power size={16} />}
-                              aria-label={customer.active ? "Deactivate customer" : "Reactivate customer"}
+                              aria-label={
+                                customer.active
+                                  ? "Deactivate customer"
+                                  : "Reactivate customer"
+                              }
                               onClick={() => handleToggleStatus(customer)}
                             />
                           </HStack>

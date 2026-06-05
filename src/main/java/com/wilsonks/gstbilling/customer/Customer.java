@@ -33,11 +33,11 @@ public class Customer extends TenantScopedEntity {
     private String tradeName;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "customer_type", nullable = false, length = 30)
+    @Column(name = "customer_type", length = 30)
     private CustomerType customerType;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "gst_registration_type", nullable = false, length = 30)
+    @Column(name = "gst_registration_type", length = 30)
     private GstRegistrationType gstRegistrationType;
 
     @Column(length = 15)
@@ -100,7 +100,7 @@ public class Customer extends TenantScopedEntity {
     @Column(name = "shipping_country", length = 100)
     private String shippingCountry;
 
-    @Column(name = "payment_terms_days", nullable = false)
+    @Column(name = "payment_terms_days")
     private Integer paymentTermsDays;
 
     @Column(nullable = false)

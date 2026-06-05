@@ -56,3 +56,47 @@ export async function reactivateCustomer(id) {
   const response = await api.post(`/api/customers/${id}/reactivate`);
   return response.data;
 }
+
+export async function downloadCustomerTemplate() {
+  const response = await api.get("/api/customers/template", {
+    responseType: "blob",
+  });
+
+  return response.data;
+}
+
+export async function exportCustomers() {
+  const response = await api.get("/api/customers/export", {
+    responseType: "blob",
+  });
+
+  return response.data;
+}
+
+export async function validateCustomerImport(file) {
+  const formData = new FormData();
+
+  formData.append("file", file);
+
+  const response = await api.post("/api/customers/import/validate", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+
+  return response.data;
+}
+
+export async function commitCustomerImport(file) {
+  const formData = new FormData();
+
+  formData.append("file", file);
+
+  const response = await api.post("/api/customers/import/commit", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+
+  return response.data;
+}

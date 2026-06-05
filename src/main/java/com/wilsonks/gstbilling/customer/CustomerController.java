@@ -66,7 +66,7 @@ public class CustomerController {
     }
 
 
-    @PostMapping("/import/validate")
+    @PostMapping(value = "/import/validate", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public CustomerImportValidationResult validateImport(
             @RequestParam("file")
             MultipartFile file) {
@@ -74,7 +74,7 @@ public class CustomerController {
         return importService.validate(file);
     }
 
-    @PostMapping("/import/commit")
+    @PostMapping(value = "/import/commit", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public CustomerImportCommitResult commitImport(
             @RequestParam("file")
             MultipartFile file) {

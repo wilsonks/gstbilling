@@ -33,9 +33,7 @@ public class ExcelHeaderValidator {
 
             if (header != null) {
 
-                actualHeaders.add(
-                        header.trim()
-                                .toUpperCase());
+                actualHeaders.add(normalizeHeader(header));
             }
         }
 
@@ -80,9 +78,7 @@ public class ExcelHeaderValidator {
             }
 
             ExcelColumn column =
-                    defs.get(
-                            header.trim()
-                                    .toUpperCase());
+                    defs.get(normalizeHeader(header));
 
             if (column != null) {
 
@@ -102,5 +98,18 @@ public class ExcelHeaderValidator {
         }
 
         return cell.getStringCellValue();
+    }
+
+    private String normalizeHeader(
+            String value) {
+
+        if (value == null) {
+            return null;
+        }
+
+        return value
+                .replace("*", "")
+                .trim()
+                .toUpperCase();
     }
 }

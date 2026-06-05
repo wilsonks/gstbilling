@@ -19,7 +19,9 @@ public class ExcelTemplateBuilder {
             String sheetName,
             List<ExcelColumn> columns) {
 
+
         try (Workbook workbook = new XSSFWorkbook()) {
+
 
 
             Sheet dataSheet =
@@ -58,16 +60,21 @@ public class ExcelTemplateBuilder {
         }
     }
 
+
     private void createDataSheet(
             Workbook workbook,
             Sheet sheet,
             List<ExcelColumn> columns) {
 
-        CellStyle headerStyle =
+
+        CellStyle normalHeaderStyle =
                 createHeaderStyle(workbook);
 
-        Row headerRow =
-                sheet.createRow(0);
+        CellStyle requiredHeaderStyle =
+                createRequiredHeaderStyle(workbook);
+
+        Row headerRow = sheet.createRow(0);
+        Row exampleRow = sheet.createRow(1);
 
         for (int i = 0; i < columns.size(); i++) {
 
@@ -77,11 +84,17 @@ public class ExcelTemplateBuilder {
             Cell cell =
                     headerRow.createCell(i);
 
-            cell.setCellValue(
-                    column.getHeader());
+            String displayHeader =
+                    column.isRequired()
+                            ? "* " + column.getHeader()
+                            : column.getHeader();
+
+            cell.setCellValue(displayHeader);
 
             cell.setCellStyle(
-                    headerStyle);
+                    column.isRequired()
+                            ? requiredHeaderStyle
+                            : normalHeaderStyle);
 
             if (column.isHidden()) {
 
@@ -100,6 +113,18 @@ public class ExcelTemplateBuilder {
                     width);
         }
 
+        for (int i = 0; i < columns.size(); i++) {
+
+            ExcelColumn column =
+                    columns.get(i);
+
+            if (column.getExample() != null) {
+
+                exampleRow.createCell(i)
+                        .setCellValue(
+                                column.getExample());
+            }
+        }
         sheet.createFreezePane(
                 0,
                 1);
@@ -261,6 +286,40 @@ public class ExcelTemplateBuilder {
 
         return style;
     }
+
+    private CellStyle createRequiredHeaderStyle(
+            Workbook workbook) {
+
+        Font font =
+                workbook.createFont();
+
+        font.setBold(true);
+
+        font.setColor(
+                IndexedColors.WHITE.getIndex());
+
+        CellStyle style =
+                workbook.createCellStyle();
+
+        style.setFont(font);
+
+        style.setFillForegroundColor(
+                IndexedColors.RED.getIndex());
+
+        style.setFillPattern(
+                FillPatternType.SOLID_FOREGROUND);
+
+        style.setBorderBottom(BorderStyle.THIN);
+        style.setBorderTop(BorderStyle.THIN);
+        style.setBorderLeft(BorderStyle.THIN);
+        style.setBorderRight(BorderStyle.THIN);
+
+        style.setAlignment(
+                HorizontalAlignment.CENTER);
+
+        return style;
+    }
+
 
     private String resolveDataType(
             Class<?> type) {
