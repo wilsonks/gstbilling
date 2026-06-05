@@ -39,6 +39,7 @@ import {
   FileSpreadsheet,
 } from "lucide-react";
 import CustomerFormModal from "./CustomerFormModal";
+import BulkImportModal from "../../components/import/BulkImportModal";
 import {
   deactivateCustomer,
   getCustomerStats,
@@ -78,18 +79,11 @@ function MetricCard({ label, value, helpText, loading = false }) {
 export default function CustomerPage() {
   const toast = useToast();
   const { isOpen, onOpen, onClose } = useDisclosure();
-
-  const fileInputRef = React.useRef(null);
-
-  const [importFile, setImportFile] = useState(null);
-
-  const [validatingImport, setValidatingImport] = useState(false);
-
-  const [committingImport, setCommittingImport] = useState(false);
-
-  const [importResult, setImportResult] = useState(null);
-
-  const [commitResult, setCommitResult] = useState(null);
+  const {
+    isOpen: isImportOpen,
+    onOpen: onImportOpen,
+    onClose: onImportClose,
+  } = useDisclosure();
 
   const [customers, setCustomers] = useState([]);
   const [stats, setStats] = useState({
@@ -290,103 +284,6 @@ export default function CustomerPage() {
     }
   };
 
-  const handleValidateImport = async () => {
-    setCommitResult(null);
-
-    if (!importFile) {
-      toast({
-        title: "Choose an Excel file first",
-        status: "warning",
-        duration: 2000,
-        isClosable: true,
-      });
-
-      return;
-    }
-
-    setValidatingImport(true);
-
-    try {
-      const result = await validateCustomerImport(importFile);
-
-      setImportResult(result);
-
-      toast({
-        title: result.valid ? "Validation Passed" : "Validation Failed",
-        status: result.valid ? "success" : "warning",
-        duration: 3000,
-        isClosable: true,
-      });
-    } catch (error) {
-      toast({
-        title: "Validation failed",
-        description: error?.response?.data?.message,
-        status: "error",
-        duration: 3000,
-        isClosable: true,
-      });
-    } finally {
-      setValidatingImport(false);
-    }
-  };
-
-  const handleCommitImport = async () => {
-    if (!importFile) {
-      return;
-    }
-
-    setCommittingImport(true);
-
-    try {
-      const result = await commitCustomerImport(importFile);
-
-      toast({
-        title:
-          result.failed > 0
-            ? "Import completed with errors"
-            : "Import completed",
-        description:
-          `${result.inserted} inserted, ` +
-          `${result.updated} updated, ` +
-          `${result.failed} failed`,
-        status: result.failed > 0 ? "warning" : "success",
-        duration: 6000,
-        isClosable: true,
-      });
-
-      setImportResult(null);
-      setImportFile(null);
-      setCommitResult(result);
-
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-
-      await loadPageData({
-        silent: true,
-      });
-    } catch (error) {
-      toast({
-        title: "Import failed",
-        description: error?.response?.data?.message,
-        status: "error",
-        duration: 4000,
-        isClosable: true,
-      });
-    } finally {
-      setCommittingImport(false);
-    }
-  };
-
-  const handleFileChange = (e) => {
-    const file = e.target.files?.[0] ?? null;
-
-    setImportFile(file);
-
-    setImportResult(null);
-    setCommitResult(null);
-  };
-
   return (
     <Stack spacing={6}>
       <Flex
@@ -418,6 +315,14 @@ export default function CustomerPage() {
             onClick={handleExport}
           >
             Export
+          </Button>
+          <Button
+            leftIcon={<Upload size={16} />}
+            variant="outline"
+            colorScheme="blue"
+            onClick={onImportOpen}
+          >
+            Bulk Import
           </Button>
           <Button
             leftIcon={<RefreshCw size={16} />}
@@ -458,118 +363,6 @@ export default function CustomerPage() {
           loading={loading}
         />
       </SimpleGrid>
-
-      <Card>
-        <CardBody>
-          <Stack spacing={4}>
-            <Heading size="sm">Customer Import</Heading>
-
-            <Input
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx"
-              onChange={handleFileChange}
-            />
-
-            <HStack>
-              <Button
-                leftIcon={<Upload size={16} />}
-                onClick={handleValidateImport}
-                isLoading={validatingImport}
-              >
-                Validate
-              </Button>
-
-              <Button
-                colorScheme="green"
-                onClick={handleCommitImport}
-                isLoading={committingImport}
-                isDisabled={!importResult?.valid}
-              >
-                Commit
-              </Button>
-            </HStack>
-          </Stack>
-        </CardBody>
-      </Card>
-
-      {importResult?.errors?.length > 0 && (
-        <Card>
-          <CardBody>
-            <Stack spacing={2}>
-              <Heading size="sm">Validation Errors</Heading>
-
-              {importResult.errors.map((error, index) => (
-                <Box key={index} p={2} borderWidth="1px" borderRadius="md">
-                  <Text fontWeight="600">Row {error.rowNumber}</Text>
-
-                  <Text>Column: {error.column}</Text>
-
-                  {error.value && <Text>Value: {error.value}</Text>}
-
-                  <Text color="red.500">{error.message}</Text>
-                </Box>
-              ))}
-            </Stack>
-          </CardBody>
-        </Card>
-      )}
-
-      {importResult && (
-        <Box p={3} borderWidth="1px" borderRadius="md">
-          <Text>Total Rows: {importResult.totalRows}</Text>
-          <Text>Valid Rows: {importResult.validRows}</Text>
-          <Text>Invalid Rows: {importResult.invalidRows}</Text>
-        </Box>
-      )}
-
-      {commitResult?.errors?.length > 0 && (
-        <Card>
-          <CardBody>
-            <Stack spacing={2}>
-              <Heading size="sm">Commit Errors</Heading>
-
-              {commitResult.errors.map((error, index) => (
-                <Box key={index} p={2} borderWidth="1px" borderRadius="md">
-                  <Text fontWeight="600">Row {error.rowNumber}</Text>
-
-                  <Text>{error.message}</Text>
-                </Box>
-              ))}
-            </Stack>
-          </CardBody>
-        </Card>
-      )}
-
-      {commitResult && (
-        <Card>
-          <CardBody>
-            <Stack spacing={2}>
-              <Heading size="sm">Import Summary</Heading>
-
-              <Text>
-                Total Rows:
-                {commitResult.totalRows}
-              </Text>
-
-              <Text color="green.600">
-                Inserted:
-                {commitResult.inserted}
-              </Text>
-
-              <Text color="blue.600">
-                Updated:
-                {commitResult.updated}
-              </Text>
-
-              <Text color="red.600">
-                Failed:
-                {commitResult.failed}
-              </Text>
-            </Stack>
-          </CardBody>
-        </Card>
-      )}
 
       <Card
         borderWidth="1px"
@@ -756,6 +549,19 @@ export default function CustomerPage() {
         </CardBody>
       </Card>
 
+      <BulkImportModal
+        isOpen={isImportOpen}
+        onClose={onImportClose}
+        entityName="Customer"
+        downloadTemplate={downloadCustomerTemplate}
+        validateImport={validateCustomerImport}
+        commitImport={commitCustomerImport}
+        onSuccess={() =>
+          loadPageData({
+            silent: true,
+          })
+        }
+      />
       <CustomerFormModal
         isOpen={isOpen}
         onClose={handleModalClose}

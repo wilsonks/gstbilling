@@ -1,11 +1,12 @@
 package com.wilsonks.gstbilling.customer;
 
+import com.wilsonks.gstbilling.bulk.excel.ExcelRowAware;
 import lombok.Data;
 
 import java.time.Instant;
 
 @Data
-public class CustomerDto {
+public class CustomerDto implements ExcelRowAware {
     private Long id;
     private Long tenantId;
 
@@ -42,10 +43,13 @@ public class CustomerDto {
 
     private Integer paymentTermsDays;
     private Boolean active;
+    private int excelRowNumber;
 
     private Instant createdAt;
     private Instant updatedAt;
     private String createdBy;
     private String updatedBy;
     private Long version;
+
+
 }

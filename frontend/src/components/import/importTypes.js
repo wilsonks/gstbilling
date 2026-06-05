@@ -1,0 +1,9 @@
+export const ImportStep = {
+  UPLOAD: "UPLOAD",
+
+  VALIDATION: "VALIDATION",
+
+  COMMITTING: "COMMITTING",
+
+  COMPLETE: "COMPLETE",
+};

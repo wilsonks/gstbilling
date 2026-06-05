@@ -10,6 +10,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Supplier;
 
 @Component
@@ -39,7 +40,8 @@ public class ExcelReader {
                             sheet,
                             columns);
 
-            List<T> rows =
+
+            List<ExcelReadRow<T>> rows =
                     new ArrayList<>();
 
             List<ExcelRowError> errors =
@@ -54,22 +56,34 @@ public class ExcelReader {
                 Row row =
                         sheet.getRow(rowIndex);
 
-                if (row == null) {
+                if (row == null || row.getPhysicalNumberOfCells() == 0) {
                     continue;
                 }
 
                 totalRows++;
 
-                T dto =
-                        supplier.get();
+                T dto = supplier.get();
 
-                rowMapper.mapRow(
+                List<ExcelRowError> rowErrors =
+                        new ArrayList<>();
+
+                Optional<T> mapped =
+                        rowMapper.mapRow(
                                 row,
                                 rowIndex + 1,
                                 dto,
                                 mapping,
-                                errors)
-                        .ifPresent(rows::add);
+                                rowErrors);
+
+                errors.addAll(rowErrors);
+
+                rows.add(
+                        new ExcelReadRow<>(
+                                rowIndex + 1,
+                                mapped.orElse(null),
+                                rowErrors
+                        )
+                );
             }
 
             int invalidRows =
@@ -82,8 +96,11 @@ public class ExcelReader {
                     rows,
                     errors,
                     totalRows,
-                    rows.size(),
-                    invalidRows);
+                    (int) rows.stream()
+                            .filter(r -> r.errors().isEmpty())
+                            .count(),
+                    invalidRows
+            );
 
         } catch (Exception ex) {
 

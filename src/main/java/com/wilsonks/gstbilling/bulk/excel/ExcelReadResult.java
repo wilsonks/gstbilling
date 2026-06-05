@@ -4,7 +4,7 @@ import java.util.List;
 
 public record ExcelReadResult<T>(
 
-        List<T> rows,
+        List<ExcelReadRow<T>> rows,
 
         List<ExcelRowError> errors,
 

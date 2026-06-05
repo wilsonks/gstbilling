@@ -561,3 +561,57 @@ customer
 ├── CustomerImportProcessor
 └── CustomerExportService
 ```
+A ReUSable, Scalable, and Maintainable framework for Excel Import/Export in the GST Billing System.
+BulkImportModal.jsx
+
+✓ Hidden file input
+✓ Chakra "Choose Excel File" button
+✓ Selected file card
+✓ Download Template
+✓ Validate
+✓ Commit
+✓ Validation Summary
+✓ Commit Summary
+✓ Error rendering
+✓ Proper state reset
+✓ Loading states
+✓ Chakra UI formatting
+✓ Ready for Customers/Products/Companies reuse
+
+
+So before commit, need a preview grid.
+
+```
+
+Validation Summary
+--------------------------------
+
+Total Rows      10
+Valid Rows       8
+Invalid Rows     2
+
+--------------------------------
+
+Preview Rows
+
+Row | Status | Code | Legal Name | GSTIN | Error
+
+3   | ✓      | C001 | ABC Ltd    | ...   |
+4   | ✗      | C002 | XYZ Ltd    | ...   | GSTIN Invalid
+5   | ✓      | C003 | PQR Ltd    | ...   |
+
+--------------------------------
+
+```
+
+Upload File
+↓
+Validate
+↓
+Summary Cards
+↓
+Preview Table
+↓
+Validation Errors
+↓
+Commit Import

@@ -29,10 +29,7 @@ public class CustomerImportValidator {
 
         } catch (Exception ex) {
 
-            int row =
-                    dto instanceof ExcelRowAware aware
-                            ? aware.getExcelRowNumber()
-                            : -1;
+            int row = dto.getExcelRowNumber();
 
             errors.add(
                     new ExcelRowError(
