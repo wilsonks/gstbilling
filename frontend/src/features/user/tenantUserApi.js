@@ -56,3 +56,62 @@ export async function reactivateTenantUser(id) {
   const response = await api.post(`/api/users/${id}/reactivate`);
   return response.data;
 }
+
+export async function downloadUserTemplate() {
+  const response = await api.get("/api/users/template", {
+    responseType: "blob",
+  });
+
+  return response.data;
+}
+
+export async function exportUsersExcel() {
+  const response = await api.get("/api/users/export", {
+    responseType: "blob",
+  });
+
+  return response.data;
+}
+
+export async function validateUserImport(file) {
+  const formData = new FormData();
+
+  formData.append("file", file);
+
+  const response = await api.post("/api/users/import/validate", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+
+  return response.data;
+}
+
+export async function commitUserImport(file) {
+  const formData = new FormData();
+
+  formData.append("file", file);
+
+  const response = await api.post("/api/users/import/commit", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+
+  return response.data;
+}
+
+export async function downloadUserImportErrors(file) {
+  const formData = new FormData();
+
+  formData.append("file", file);
+
+  const response = await api.post("/api/users/import/errors", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+    responseType: "blob",
+  });
+
+  return response.data;
+}

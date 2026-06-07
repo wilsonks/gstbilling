@@ -28,18 +28,39 @@ import {
   useDisclosure,
   useToast,
 } from "@chakra-ui/react";
-import { Edit, Plus, Power, RefreshCw, UserCog } from "lucide-react";
+import {
+  Edit,
+  Plus,
+  Power,
+  RefreshCw,
+  UserCog,
+  Download,
+  Upload,
+  FileSpreadsheet,
+} from "lucide-react";
 import TenantUserFormModal from "./TenantUserFormModal";
+import BulkImportModal from "../../components/import/BulkImportModal";
+
 import {
   deactivateTenantUser,
   getMyTenantUsers,
   getTenantUserStats,
   reactivateTenantUser,
+  downloadUserTemplate,
+  exportUsersExcel,
+  validateUserImport,
+  commitUserImport,
+  downloadUserImportErrors,
 } from "./tenantUserApi";
 
 function MetricCard({ label, value, helpText, loading = false }) {
   return (
-    <Card borderWidth="1px" borderColor="gray.200" shadow="sm" borderRadius="xl">
+    <Card
+      borderWidth="1px"
+      borderColor="gray.200"
+      shadow="sm"
+      borderRadius="xl"
+    >
       <CardBody>
         <Stat>
           <StatLabel color="gray.500">{label}</StatLabel>
@@ -55,9 +76,77 @@ function MetricCard({ label, value, helpText, loading = false }) {
   );
 }
 
+const userPreviewColumns = [
+  {
+    label: "Username",
+    dtoField: "username",
+    rawField: "USERNAME",
+  },
+
+  {
+    label: "Email",
+    dtoField: "email",
+    rawField: "EMAIL",
+  },
+
+  {
+    label: "Roles",
+    dtoField: "roles",
+    rawField: "ROLES",
+  },
+
+  {
+    label: "Active",
+    dtoField: "active",
+    rawField: "ACTIVE",
+  },
+];
+
+const customerValidationColumns = [
+  {
+    key: "rowNumber",
+    label: "Row",
+  },
+  {
+    key: "column",
+    label: "Column",
+  },
+  {
+    key: "value",
+    label: "Value",
+  },
+  {
+    key: "message",
+    label: "Error",
+  },
+];
+
+const summaryCards = [
+  {
+    label: "Total Rows",
+    field: "totalRows",
+    color: undefined,
+  },
+  {
+    label: "Valid Rows",
+    field: "validRows",
+    color: "green.500",
+  },
+  {
+    label: "Invalid Rows",
+    field: "invalidRows",
+    color: "red.500",
+  },
+];
+
 export default function TenantUserPage() {
   const toast = useToast();
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const {
+    isOpen: isImportOpen,
+    onOpen: onImportOpen,
+    onClose: onImportClose,
+  } = useDisclosure();
 
   const [users, setUsers] = useState([]);
   const [stats, setStats] = useState({
@@ -75,6 +164,36 @@ export default function TenantUserPage() {
   const [roleFilter, setRoleFilter] = useState("");
 
   const [selectedUser, setSelectedUser] = useState(null);
+
+  const downloadBlob = (blob, filename) => {
+    const url = window.URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+
+    link.href = url;
+
+    link.download = filename;
+
+    document.body.appendChild(link);
+
+    link.click();
+
+    link.remove();
+
+    window.URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadTemplate = async () => {
+    const blob = await downloadUserTemplate();
+
+    downloadBlob(blob, "user-template.xlsx");
+  };
+
+  const handleExport = async () => {
+    const blob = await exportUsersExcel();
+
+    downloadBlob(blob, "users.xlsx");
+  };
 
   const loadPageData = async ({ silent = false } = {}) => {
     if (silent) {
@@ -96,7 +215,7 @@ export default function TenantUserPage() {
           active: 0,
           inactive: 0,
           recentUsers: [],
-        }
+        },
       );
     } catch (error) {
       toast({
@@ -120,7 +239,9 @@ export default function TenantUserPage() {
   }, []);
 
   const roleOptions = useMemo(() => {
-    return [...new Set(users.flatMap((user) => user.roles || []).filter(Boolean))].sort();
+    return [
+      ...new Set(users.flatMap((user) => user.roles || []).filter(Boolean)),
+    ].sort();
   }, [users]);
 
   const filteredUsers = useMemo(() => {
@@ -129,15 +250,20 @@ export default function TenantUserPage() {
     return users.filter((user) => {
       const matchesQuery =
         !q ||
-        String(user.username || "").toLowerCase().includes(q) ||
-        String(user.email || "").toLowerCase().includes(q);
+        String(user.username || "")
+          .toLowerCase()
+          .includes(q) ||
+        String(user.email || "")
+          .toLowerCase()
+          .includes(q);
 
       const matchesStatus =
         !statusFilter ||
         (statusFilter === "ACTIVE" && user.active) ||
         (statusFilter === "INACTIVE" && !user.active);
 
-      const matchesRole = !roleFilter || (user.roles || []).includes(roleFilter);
+      const matchesRole =
+        !roleFilter || (user.roles || []).includes(roleFilter);
 
       return matchesQuery && matchesStatus && matchesRole;
     });
@@ -202,6 +328,30 @@ export default function TenantUserPage() {
 
         <HStack spacing={3}>
           <Button
+            leftIcon={<FileSpreadsheet size={16} />}
+            variant="outline"
+            onClick={handleDownloadTemplate}
+          >
+            Template
+          </Button>
+
+          <Button
+            leftIcon={<Download size={16} />}
+            variant="outline"
+            onClick={handleExport}
+          >
+            Export
+          </Button>
+          <Button
+            leftIcon={<Upload size={16} />}
+            variant="outline"
+            colorScheme="blue"
+            onClick={onImportOpen}
+          >
+            Bulk Import
+          </Button>
+
+          <Button
             leftIcon={<RefreshCw size={16} />}
             variant="outline"
             onClick={() => loadPageData({ silent: true })}
@@ -210,7 +360,11 @@ export default function TenantUserPage() {
             Refresh
           </Button>
 
-          <Button leftIcon={<Plus size={16} />} colorScheme="blue" onClick={handleCreate}>
+          <Button
+            leftIcon={<Plus size={16} />}
+            colorScheme="blue"
+            onClick={handleCreate}
+          >
             New User
           </Button>
         </HStack>
@@ -237,7 +391,12 @@ export default function TenantUserPage() {
         />
       </SimpleGrid>
 
-      <Card borderWidth="1px" borderColor="gray.200" shadow="sm" borderRadius="xl">
+      <Card
+        borderWidth="1px"
+        borderColor="gray.200"
+        shadow="sm"
+        borderRadius="xl"
+      >
         <CardBody>
           <Stack spacing={4}>
             <SimpleGrid columns={{ base: 1, lg: 3 }} spacing={3}>
@@ -340,7 +499,11 @@ export default function TenantUserPage() {
                               variant="outline"
                               colorScheme={user.active ? "red" : "green"}
                               icon={<Power size={16} />}
-                              aria-label={user.active ? "Deactivate user" : "Reactivate user"}
+                              aria-label={
+                                user.active
+                                  ? "Deactivate user"
+                                  : "Reactivate user"
+                              }
                               onClick={() => handleToggleStatus(user)}
                             />
                           </HStack>
@@ -360,6 +523,22 @@ export default function TenantUserPage() {
         onClose={handleModalClose}
         onSuccess={() => loadPageData({ silent: true })}
         user={selectedUser}
+      />
+
+      <BulkImportModal
+        isOpen={isImportOpen}
+        onClose={onImportClose}
+        entityName="User"
+        previewColumns={userPreviewColumns}
+        downloadTemplate={downloadUserTemplate}
+        downloadErrors={downloadUserImportErrors}
+        validateImport={validateUserImport}
+        commitImport={commitUserImport}
+        onSuccess={() =>
+          loadPageData({
+            silent: true,
+          })
+        }
       />
     </Stack>
   );

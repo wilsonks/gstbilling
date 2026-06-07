@@ -1,7 +1,9 @@
 package com.wilsonks.gstbilling.auth.identity;
 
+import com.wilsonks.gstbilling.auth.identity.imports.TenantUserImportDto;
 import com.wilsonks.gstbilling.context.TenantContext;
 import com.wilsonks.gstbilling.exception.NotFoundException;
+import io.micrometer.common.KeyValues;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -10,6 +12,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
@@ -36,7 +39,9 @@ public class TenantUserService {
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setScope(UserScope.TENANT);
         user.setTenantId(tenantId);
-        user.setRoles(request.getRoles());
+        user.setRoles( new ArrayList<>(
+                request.getRoles()
+        ));
         user.setActive(request.getActive() == null || request.getActive());
 
         try {
@@ -58,7 +63,9 @@ public class TenantUserService {
             throw new IllegalArgumentException("Only tenant users can be modified here");
         }
         user.setEmail(request.getEmail());
-        user.setRoles(request.getRoles());
+        user.setRoles( new ArrayList<>(
+                request.getRoles()
+        ));
         if (request.getActive() != null) {
             user.setActive(request.getActive());
         }
@@ -237,5 +244,20 @@ public class TenantUserService {
         dto.setUpdatedBy(user.getUpdatedBy());
         dto.setVersion(user.getVersion());
         return dto;
+    }
+
+    public List<TenantUserImportDto> getMine() {
+        Long tenantId = getTenantIdOrThrow();
+
+        return userRepository.findByTenantIdAndScope(tenantId, UserScope.TENANT)
+                .stream()
+                .map(user -> {
+                    TenantUserImportDto dto = new TenantUserImportDto();
+                    dto.setUsername(user.getUsername());
+                    dto.setEmail(user.getEmail());
+                    dto.setRoles(String.join(",", user.getRoles()));
+                    return dto;
+                })
+                .toList();
     }
 }
