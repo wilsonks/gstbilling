@@ -19,6 +19,7 @@ public class CustomerController {
 
     private final CustomerService service;
     private final CustomerImportService importService;
+    private final CustomerImportErrorExportService errorExportService;
     private final CustomerExportService exportService;
     private final CustomerTemplateService templateService;
 
@@ -38,10 +39,7 @@ public class CustomerController {
     }
 
     @GetMapping
-    public Page<CustomerDto> list(
-            @RequestParam(required = false) String q,
-            Pageable pageable
-    ) {
+    public Page<CustomerDto> list(@RequestParam(required = false) String q, Pageable pageable) {
         return service.list(q, pageable);
     }
 
@@ -67,17 +65,13 @@ public class CustomerController {
 
 
     @PostMapping(value = "/import/validate", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public CustomerImportValidationResult validateImport(
-            @RequestParam("file")
-            MultipartFile file) {
+    public CustomerImportValidationResult validateImport(@RequestParam("file") MultipartFile file) {
 
         return importService.validate(file);
     }
 
     @PostMapping(value = "/import/commit", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public CustomerImportCommitResult commitImport(
-            @RequestParam("file")
-            MultipartFile file) {
+    public CustomerImportCommitResult commitImport(@RequestParam("file") MultipartFile file) {
 
         return importService.commit(file);
     }
@@ -85,32 +79,25 @@ public class CustomerController {
     @GetMapping("/export")
     public ResponseEntity<byte[]> export() {
 
-        byte[] file =
-                exportService.export();
+        byte[] file = exportService.export();
 
-        return ResponseEntity.ok()
-                .header(
-                        HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=customers.xlsx")
-                .contentType(
-                        MediaType.parseMediaType(
-                                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
-                .body(file);
+        return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=customers.xlsx").contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")).body(file);
     }
 
     @GetMapping("/template")
     public ResponseEntity<byte[]> template() {
 
-        byte[] file =
-                templateService.generateTemplate();
+        byte[] file = templateService.generateTemplate();
 
-        return ResponseEntity.ok()
-                .header(
-                        HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=customer-template.xlsx")
-                .contentType(
-                        MediaType.parseMediaType(
-                                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
-                .body(file);
+        return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=customer-template.xlsx").contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")).body(file);
     }
+
+    @PostMapping(value = "/import/errors", produces = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<byte[]> downloadErrors(@RequestParam("file") MultipartFile file) {
+
+        byte[] bytes = errorExportService.exportErrors(file);
+
+        return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=customer-import-errors.xlsx").contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")).body(bytes);
+    }
+
 }

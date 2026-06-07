@@ -44,11 +44,23 @@ const ImportStep = {
   COMPLETE: "COMPLETE",
 };
 
+const getPreviewValue = (row, dtoField, rawField) => {
+  if (row.data?.[dtoField] !== undefined && row.data?.[dtoField] !== null) {
+    return row.data[dtoField];
+  }
+
+  return row.rawValues?.[rawField] ?? "-";
+};
+
 export default function BulkImportModal({
   isOpen,
   onClose,
   entityName,
+  previewColumns = [],
+  validationColumns = [],
+  summaryCards = [],
   downloadTemplate,
+  downloadErrors,
   validateImport,
   commitImport,
   onSuccess,
@@ -66,6 +78,8 @@ export default function BulkImportModal({
   const [step, setStep] = useState(ImportStep.UPLOAD);
 
   const [loading, setLoading] = useState(false);
+
+  const [downloadingErrors, setDownloadingErrors] = useState(false);
 
   const resetState = () => {
     setFile(null);
@@ -101,6 +115,25 @@ export default function BulkImportModal({
         duration: 3000,
         isClosable: true,
       });
+    }
+  };
+
+  const handleDownloadErrors = async () => {
+    setDownloadingErrors(true);
+
+    try {
+      const blob = await downloadErrors(file);
+
+      downloadBlob(blob, `${entityName.toLowerCase()}-import-errors.xlsx`);
+    } catch (error) {
+      toast({
+        title: "Failed to download errors",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+    } finally {
+      setDownloadingErrors(false);
     }
   };
 
@@ -348,13 +381,35 @@ export default function BulkImportModal({
                 </GridItem>
               </Grid>
 
-              <Text fontWeight="bold" mt={4}>
-                Preview Rows
-              </Text>
+              {validationResult.invalidRows > 0 ? (
+                <Alert status="warning">
+                  <AlertIcon />
+                  {validationResult.invalidRows} row(s) require attention before
+                  import.
+                </Alert>
+              ) : (
+                <Alert status="success">
+                  <AlertIcon />
+                  All rows passed validation and are ready for import.
+                </Alert>
+              )}
 
-              <Text fontSize="sm" color="gray.500">
-                Showing first {Math.min(validationResult.rows?.length ?? 0, 20)}{" "}
-                rows.
+              {validationResult.invalidRows > 0 && (
+                <Button
+                  leftIcon={<Download size={16} />}
+                  colorScheme="orange"
+                  variant="outline"
+                  isLoading={downloadingErrors}
+                  onClick={handleDownloadErrors}
+                  alignSelf="flex-start"
+                >
+                  Download Errors.xlsx
+                </Button>
+              )}
+
+              <Text fontWeight="bold">
+                Preview Rows ({Math.min(validationResult.rows?.length ?? 0, 20)}
+                )
               </Text>
 
               <TableContainer>
@@ -363,11 +418,10 @@ export default function BulkImportModal({
                     <Tr>
                       <Th>Row</Th>
                       <Th>Status</Th>
-                      <Th>Code</Th>
-                      <Th>Legal Name</Th>
-                      <Th>GSTIN</Th>
-                      <Th>Type</Th>
-                      <Th>Issues</Th>
+                      {previewColumns.map((column) => (
+                        <Th key={column.dtoField}>{column.label}</Th>
+                      ))}
+                      <Th>First Issue</Th>
                     </Tr>
                   </Thead>
 
@@ -375,7 +429,7 @@ export default function BulkImportModal({
                     {validationResult.rows?.slice(0, 20).map((row) => (
                       <Tr
                         key={row.rowNumber}
-                        bg={row.valid ? "green.50" : "red.50"}
+                        bg={row.valid ? undefined : "red.50"}
                       >
                         <Td>{row.rowNumber}</Td>
 
@@ -385,13 +439,19 @@ export default function BulkImportModal({
                           </Badge>
                         </Td>
 
-                        <Td>{row.data?.code ?? "-"}</Td>
+                        {previewColumns.map((column) => {
+                          let value = getPreviewValue(
+                            row,
+                            column.dtoField,
+                            column.rawField,
+                          );
 
-                        <Td>{row.data?.legalName ?? "-"}</Td>
+                          if (column.formatter) {
+                            value = column.formatter(value);
+                          }
 
-                        <Td>{row.data?.gstin ?? "-"}</Td>
-
-                        <Td>{row.data?.customerType?.replaceAll("_", " ")}</Td>
+                          return <Td key={column.dtoField}>{value ?? "-"}</Td>;
+                        })}
 
                         <Td>
                           <Badge
@@ -399,7 +459,7 @@ export default function BulkImportModal({
                               row.errors?.length > 0 ? "red" : "green"
                             }
                           >
-                            {row.errors?.length ?? 0}
+                            {row.errors?.[0] ?? "-"}
                           </Badge>
                         </Td>
                       </Tr>
@@ -407,8 +467,6 @@ export default function BulkImportModal({
                   </Tbody>
                 </Table>
               </TableContainer>
-
-              {renderErrors(validationResult.errors)}
 
               {validationResult.valid ? (
                 <Alert status="success">
@@ -497,7 +555,6 @@ export default function BulkImportModal({
                   </Table>
                 </TableContainer>
               )}
-              {renderErrors(commitResult.errors)}
             </VStack>
           )}
         </ModalBody>

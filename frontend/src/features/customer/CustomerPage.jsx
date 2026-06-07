@@ -46,6 +46,7 @@ import {
   getMyCustomers,
   reactivateCustomer,
   downloadCustomerTemplate,
+  downloadCustomerErrors,
   exportCustomers,
   validateCustomerImport,
   commitCustomerImport,
@@ -75,6 +76,72 @@ function MetricCard({ label, value, helpText, loading = false }) {
     </Card>
   );
 }
+
+const customerPreviewColumns = [
+  {
+    label: "Code",
+    dtoField: "code",
+    rawField: "CODE",
+  },
+  {
+    label: "Legal Name",
+    dtoField: "legalName",
+    rawField: "LEGAL_NAME",
+  },
+  {
+    label: "Trade Name",
+    dtoField: "tradeName",
+    rawField: "TRADE_NAME",
+  },
+  {
+    label: "GSTIN",
+    dtoField: "gstin",
+    rawField: "GSTIN",
+  },
+  {
+    label: "Type",
+    dtoField: "customerType",
+    rawField: "CUSTOMER_TYPE",
+    formatter: (value) => value?.toString().replaceAll("_", " "),
+  },
+];
+
+const customerValidationColumns = [
+  {
+    key: "rowNumber",
+    label: "Row",
+  },
+  {
+    key: "column",
+    label: "Column",
+  },
+  {
+    key: "value",
+    label: "Value",
+  },
+  {
+    key: "message",
+    label: "Error",
+  },
+];
+
+const summaryCards = [
+  {
+    label: "Total Rows",
+    field: "totalRows",
+    color: undefined,
+  },
+  {
+    label: "Valid Rows",
+    field: "validRows",
+    color: "green.500",
+  },
+  {
+    label: "Invalid Rows",
+    field: "invalidRows",
+    color: "red.500",
+  },
+];
 
 export default function CustomerPage() {
   const toast = useToast();
@@ -553,7 +620,11 @@ export default function CustomerPage() {
         isOpen={isImportOpen}
         onClose={onImportClose}
         entityName="Customer"
+        previewColumns={customerPreviewColumns}
+        validationColumns={customerValidationColumns}
+        summaryCards={summaryCards}
         downloadTemplate={downloadCustomerTemplate}
+        downloadErrors={downloadCustomerErrors}
         validateImport={validateCustomerImport}
         commitImport={commitCustomerImport}
         onSuccess={() =>

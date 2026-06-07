@@ -615,3 +615,23 @@ Preview Table
 Validation Errors
 ↓
 Commit Import
+
+
+✓ Template Download
+✓ Excel Upload
+✓ Header Validation
+✓ DTO Mapping
+✓ Row-Level Validation
+✓ Duplicate Detection
+✓ Validation Preview Grid
+✓ Commit Import
+✓ Error Workbook Export
+✓ Raw Value Preservation
+
+
+1. Finish Download Errors.xlsx
+2. Product Import
+3. Company Import
+4. Import History
+5. Generic BulkImportModule<T>
+6. Async Imports

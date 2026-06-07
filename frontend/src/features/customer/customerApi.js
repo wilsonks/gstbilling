@@ -65,6 +65,21 @@ export async function downloadCustomerTemplate() {
   return response.data;
 }
 
+export async function downloadCustomerErrors(file) {
+  const formData = new FormData();
+
+  formData.append("file", file);
+
+  const response = await api.post("/api/customers/import/errors", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+    responseType: "blob",
+  });
+
+  return response.data;
+}
+
 export async function exportCustomers() {
   const response = await api.get("/api/customers/export", {
     responseType: "blob",

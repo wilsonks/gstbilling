@@ -22,29 +22,17 @@ public class CustomerExportService {
 
     public byte[] export() {
 
-        List<CustomerDto> customers =
-                customerService.getAllForCurrentTenant();
+        List<CustomerDto> customers = customerService.getAllForCurrentTenant();
 
-        log.info(
-                "Exporting {} customers",
-                customers.size());
+        log.info("Exporting {} customers", customers.size());
 
-        return excelWriter.write(
-                "Customers",
-                customers,
-                excelDefinition.columns());
+        return excelWriter.write("Customers", customers, excelDefinition.columns());
     }
 
-    public byte[] export(
-            List<CustomerDto> customers) {
+    public byte[] export(List<CustomerDto> customers) {
 
-        log.info(
-                "Exporting {} supplied customers",
-                customers.size());
+        log.info("Exporting {} supplied customers", customers.size());
 
-        return excelWriter.write(
-                "Customers",
-                customers,
-                excelDefinition.columns());
+        return excelWriter.write("Customers", customers, excelDefinition.columns());
     }
 }

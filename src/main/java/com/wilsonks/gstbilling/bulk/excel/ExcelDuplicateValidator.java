@@ -7,46 +7,28 @@ import java.util.*;
 @Component
 public class ExcelDuplicateValidator {
 
-    public <T> List<ExcelRowError> validate(
-            List<T> rows,
-            DuplicateKeyProvider<T> provider) {
+    public <T> List<ExcelRowError> validate(List<T> rows, DuplicateKeyProvider<T> provider) {
 
-        List<ExcelRowError> errors =
-                new ArrayList<>();
+        List<ExcelRowError> errors = new ArrayList<>();
 
-        Map<String,Integer> seen =
-                new HashMap<>();
+        Map<String, Integer> seen = new HashMap<>();
 
         for (T row : rows) {
 
-            String key =
-                    provider.duplicateKey(row);
+            String key = provider.duplicateKey(row);
 
-            if (key == null ||
-                    key.isBlank()) {
+            if (key == null || key.isBlank()) {
 
                 continue;
             }
 
-            int excelRowNumber =
-                    row instanceof ExcelRowAware aware
-                            ? aware.getExcelRowNumber()
-                            : -1;
+            int excelRowNumber = row instanceof ExcelRowAware aware ? aware.getExcelRowNumber() : -1;
 
-            Integer previous =
-                    seen.putIfAbsent(
-                            key.toUpperCase(),
-                            excelRowNumber);
+            Integer previous = seen.putIfAbsent(key.toUpperCase(), excelRowNumber);
 
             if (previous != null) {
 
-                errors.add(
-                        new ExcelRowError(
-                                excelRowNumber,
-                                "KEY",
-                                key,
-                                "Duplicate value also exists in row "
-                                        + previous));
+                errors.add(new ExcelRowError(excelRowNumber, "KEY", key, "Duplicate value also exists in row " + previous));
             }
         }
 

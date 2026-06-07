@@ -43,167 +43,88 @@ public class CustomerImportService {
 
     private final CustomerService customerService;
 
-    public CustomerImportValidationResult validate(
-            MultipartFile file) {
+    public CustomerImportValidationResult validate(MultipartFile file) {
 
         try {
 
-            ExcelReadResult<CustomerDto> readResult =
-                    excelReader.read(
-                            file.getInputStream(),
-                            CustomerDto::new,
-                            excelDefinition.columns());
+            //step 1. read and validate excel, separate valid and invalid rows
+            ExcelReadResult<CustomerDto> readResult = excelReader.read(file.getInputStream(), CustomerDto::new, excelDefinition.columns());
 
-            List<ExcelRowError> allErrors =
-                    new ArrayList<>(readResult.errors());
+            List<ExcelRowError> allErrors = new ArrayList<>(readResult.errors());
 
-            List<CustomerDto> validDtos =
-                    readResult.rows()
-                            .stream()
-                            .map(ExcelReadRow::data)
-                            .filter(Objects::nonNull)
-                            .toList();
+            List<CustomerDto> validDtos = readResult.rows().stream().map(ExcelReadRow::data).filter(Objects::nonNull).toList();
 
-            List<ExcelRowError> duplicateErrors =
-                    duplicateValidator.validate(
-                            validDtos,
-                            duplicateKeyProvider);
+            List<ExcelRowError> duplicateErrors = duplicateValidator.validate(validDtos, duplicateKeyProvider);
 
             allErrors.addAll(duplicateErrors);
 
-            Map<Integer, List<String>> duplicateErrorMap =
-                    duplicateErrors.stream()
-                            .collect(
-                                    Collectors.groupingBy(
-                                            ExcelRowError::rowNumber,
-                                            Collectors.mapping(
-                                                    ExcelRowError::message,
-                                                    Collectors.toList()
-                                            )
-                                    )
-                            );
+            Map<Integer, List<String>> duplicateErrorMap = duplicateErrors.stream().collect(Collectors.groupingBy(ExcelRowError::rowNumber, Collectors.mapping(ExcelRowError::message, Collectors.toList())));
 
-            List<ImportRowResult<CustomerDto>> rows =
-                    new ArrayList<>();
+            List<ImportRowResult<CustomerDto>> rows = new ArrayList<>();
 
-            for (ExcelReadRow<CustomerDto> excelRow
-                    : readResult.rows()) {
+            for (ExcelReadRow<CustomerDto> excelRow : readResult.rows()) {
 
-                CustomerDto dto =
-                        excelRow.data();
+                CustomerDto dto = excelRow.data();
 
-                List<String> rowErrors =
-                        excelRow.errors()
-                                .stream()
-                                .map(ExcelRowError::message)
-                                .collect(Collectors.toCollection(
-                                        ArrayList::new));
+                List<String> rowErrors = excelRow.errors().stream().map(ExcelRowError::message).collect(Collectors.toCollection(ArrayList::new));
 
                 if (dto == null) {
 
-                    rowErrors.addAll(
-                            duplicateErrorMap.getOrDefault(
-                                    excelRow.rowNumber(),
-                                    List.of()));
+                    rowErrors.addAll(duplicateErrorMap.getOrDefault(excelRow.rowNumber(), List.of()));
 
-                    rows.add(
-                            new ImportRowResult<>(
-                                    excelRow.rowNumber(),
-                                    false,
-                                    null,
-                                    rowErrors
-                            )
-                    );
+                    rows.add(new ImportRowResult<>(excelRow.rowNumber(), false, null, excelRow.rawValues(),  rowErrors));
 
                     continue;
                 }
 
-                List<ExcelRowError> validationErrors =
-                        importValidator.validate(dto);
+                List<ExcelRowError> validationErrors = importValidator.validate(dto);
 
                 allErrors.addAll(validationErrors);
 
-                rowErrors.addAll(
-                        validationErrors.stream()
-                                .map(ExcelRowError::message)
-                                .toList());
+                rowErrors.addAll(validationErrors.stream().map(ExcelRowError::message).toList());
 
-                rowErrors.addAll(
-                        duplicateErrorMap.getOrDefault(
-                                excelRow.rowNumber(),
-                                List.of()));
+                rowErrors.addAll(duplicateErrorMap.getOrDefault(excelRow.rowNumber(), List.of()));
 
-                rows.add(
-                        new ImportRowResult<>(
-                                excelRow.rowNumber(),
-                                rowErrors.isEmpty(),
-                                dto,
-                                rowErrors
-                        )
-                );
+                rows.add(new ImportRowResult<>(excelRow.rowNumber(), rowErrors.isEmpty(), dto, excelRow.rawValues(), rowErrors));
             }
 
-            int invalidRows =
-                    (int) rows.stream()
-                            .filter(row -> !row.valid())
-                            .count();
+            int invalidRows = (int) rows.stream().filter(row -> !row.valid()).count();
 
-            int validRows =
-                    rows.size() - invalidRows;
+            int validRows = rows.size() - invalidRows;
 
-            return new CustomerImportValidationResult(
-                    allErrors.isEmpty(),
-                    readResult.totalRows(),
-                    validRows,
-                    invalidRows,
-                    allErrors,
-                    rows
-            );
+            return new CustomerImportValidationResult(allErrors.isEmpty(), readResult.totalRows(), validRows, invalidRows, allErrors, rows);
 
         } catch (IOException ex) {
 
-            throw new IllegalStateException(
-                    "Failed reading uploaded file",
-                    ex);
+            throw new IllegalStateException("Failed reading uploaded file", ex);
         }
     }
 
     @Transactional
-    public CustomerImportCommitResult commit(
-            MultipartFile file) {
+    public CustomerImportCommitResult commit(MultipartFile file) {
 
-        CustomerImportValidationResult validation =
-                validate(file);
+        CustomerImportValidationResult validation = validate(file);
 
         if (!validation.valid()) {
 
-            throw new IllegalArgumentException(
-                    "Import contains validation errors. Fix validation errors before committing.");
+            throw new IllegalArgumentException("Import contains validation errors. Fix validation errors before committing.");
         }
 
         try {
 
-            Long tenantId =
-                    getTenantIdOrThrow();
+            Long tenantId = getTenantIdOrThrow();
 
-            ExcelReadResult<CustomerDto> readResult =
-                    excelReader.read(
-                            file.getInputStream(),
-                            CustomerDto::new,
-                            excelDefinition.columns());
+            ExcelReadResult<CustomerDto> readResult = excelReader.read(file.getInputStream(), CustomerDto::new, excelDefinition.columns());
 
             int inserted = 0;
             int updated = 0;
             int failed = 0;
 
-            List<ExcelRowError> errors =
-                    new ArrayList<>();
+            List<ExcelRowError> errors = new ArrayList<>();
 
-            for (ExcelReadRow<CustomerDto> excelRow
-                    : readResult.rows()) {
+            for (ExcelReadRow<CustomerDto> excelRow : readResult.rows()) {
 
-                CustomerDto dto =
-                        excelRow.data();
+                CustomerDto dto = excelRow.data();
 
                 if (dto == null) {
                     continue;
@@ -211,16 +132,11 @@ public class CustomerImportService {
 
                 try {
 
-                    Optional<Customer> existing =
-                            matchStrategy.findMatch(
-                                    tenantId,
-                                    dto);
+                    Optional<Customer> existing = matchStrategy.findMatch(tenantId, dto);
 
                     if (existing.isPresent()) {
 
-                        customerService.update(
-                                existing.get().getId(),
-                                dto);
+                        customerService.update(existing.get().getId(), dto);
 
                         updated++;
 
@@ -235,48 +151,27 @@ public class CustomerImportService {
 
                     failed++;
 
-                    errors.add(
-                            new ExcelRowError(
-                                    dto.getExcelRowNumber(),
-                                    "ROW",
-                                    null,
-                                    ex.getMessage()
-                            )
-                    );
+                    errors.add(new ExcelRowError(dto.getExcelRowNumber(), "ROW", null, ex.getMessage()));
 
-                    log.error(
-                            "Failed importing customer row {}",
-                            dto.getExcelRowNumber(),
-                            ex
-                    );
+                    log.error("Failed importing customer row {}", dto.getExcelRowNumber(), ex);
                 }
             }
 
-            return new CustomerImportCommitResult(
-                    readResult.totalRows(),
-                    inserted,
-                    updated,
-                    failed,
-                    errors
-            );
+            return new CustomerImportCommitResult(readResult.totalRows(), inserted, updated, failed, errors);
 
         } catch (IOException ex) {
 
-            throw new IllegalStateException(
-                    "Failed reading uploaded file",
-                    ex);
+            throw new IllegalStateException("Failed reading uploaded file", ex);
         }
     }
 
     private Long getTenantIdOrThrow() {
 
-        Long tenantId =
-                TenantContext.get();
+        Long tenantId = TenantContext.get();
 
         if (tenantId == null) {
 
-            throw new IllegalStateException(
-                    "No tenant in request context");
+            throw new IllegalStateException("No tenant in request context");
         }
 
         return tenantId;
