@@ -41,3 +41,74 @@ export async function getNextInvoiceNumber(documentType) {
   });
   return response.data;
 }
+
+export async function downloadInvoiceSequenceTemplate() {
+  const response = await api.get("/api/invoice-sequences/template", {
+    responseType: "blob",
+  });
+
+  return response.data;
+}
+
+export async function exportInvoiceSequences() {
+  const response = await api.get("/api/invoice-sequences/export", {
+    responseType: "blob",
+  });
+
+  return response.data;
+}
+
+export async function validateInvoiceSequenceImport(file) {
+  const formData = new FormData();
+
+  formData.append("file", file);
+
+  const response = await api.post(
+    "/api/invoice-sequences/import/validate",
+    formData,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    },
+  );
+
+  return response.data;
+}
+
+export async function commitInvoiceSequenceImport(file) {
+  const formData = new FormData();
+
+  formData.append("file", file);
+
+  const response = await api.post(
+    "/api/invoice-sequences/import/commit",
+    formData,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    },
+  );
+
+  return response.data;
+}
+
+export async function downloadInvoiceSequenceImportErrors(file) {
+  const formData = new FormData();
+
+  formData.append("file", file);
+
+  const response = await api.post(
+    "/api/invoice-sequences/import/errors",
+    formData,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+      responseType: "blob",
+    },
+  );
+
+  return response.data;
+}

@@ -105,7 +105,7 @@ const handleDownloadTemplate = async () => {
   downloadBlob(blob, "company-template.xlsx");
 };
 
-const handleExportCompanies = async () => {
+const handleExport = async () => {
   const blob = await exportCompaniesExcel();
 
   downloadBlob(blob, "companies.xlsx");
@@ -403,7 +403,7 @@ export default function TenantCompanyPage() {
           <Button
             leftIcon={<Download size={16} />}
             variant="outline"
-            onClick={handleExportCompanies}
+            onClick={handleExport}
           >
             Export
           </Button>

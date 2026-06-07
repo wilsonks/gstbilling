@@ -21,12 +21,27 @@ import {
   useDisclosure,
   useToast,
 } from "@chakra-ui/react";
-import { Edit, Hash, Plus, Power, RefreshCw } from "lucide-react";
+import {
+  Edit,
+  Hash,
+  Plus,
+  Power,
+  RefreshCw,
+  Upload,
+  Download,
+  FileSpreadsheet,
+} from "lucide-react";
 import InvoiceSequenceModal from "./InvoiceSequenceModal";
+import BulkImportModal from "../../components/import/BulkImportModal";
 import {
   deactivateInvoiceSequence,
   getInvoiceSequences,
   reactivateInvoiceSequence,
+  downloadInvoiceSequenceTemplate,
+  exportInvoiceSequences,
+  validateInvoiceSequenceImport,
+  commitInvoiceSequenceImport,
+  downloadInvoiceSequenceImportErrors,
 } from "./invoiceSequenceApi";
 import { getMyCompanies } from "../company/companyApi";
 
@@ -38,13 +53,124 @@ function buildPreview(sequence) {
   const prefix = sequence.prefix || "";
   const suffix = sequence.suffix || "";
   const nextNumber = Number(sequence.currentNumber || 0) + 1;
-  const padded = String(nextNumber).padStart(Number(sequence.paddingLength || 1), "0");
+  const padded = String(nextNumber).padStart(
+    Number(sequence.paddingLength || 1),
+    "0",
+  );
   return `${prefix}${padded}${suffix}`;
 }
+
+const invoiceSequencePreviewColumns = [
+  {
+    label: "Company",
+    dtoField: "companyName",
+    rawField: "COMPANY_NAME",
+  },
+
+  {
+    label: "Document Type",
+    dtoField: "documentType",
+    rawField: "DOCUMENT_TYPE",
+  },
+
+  {
+    label: "Financial Year",
+    dtoField: "financialYear",
+    rawField: "FINANCIAL_YEAR",
+  },
+
+  {
+    label: "Prefix",
+    dtoField: "prefix",
+    rawField: "PREFIX",
+  },
+
+  {
+    label: "Padding",
+    dtoField: "paddingLength",
+    rawField: "PADDING_LENGTH",
+  },
+
+  {
+    label: "Current Number",
+    dtoField: "currentNumber",
+    rawField: "CURRENT_NUMBER",
+  },
+
+  {
+    label: "Reset Policy",
+    dtoField: "resetPolicy",
+    rawField: "RESET_POLICY",
+  },
+
+  {
+    label: "Active",
+    dtoField: "active",
+    rawField: "ACTIVE",
+    formatter: (value) => (value === true || value === "TRUE" ? "Yes" : "No"),
+  },
+];
+
+const validationColumns = [
+  {
+    key: "rowNumber",
+    label: "Row",
+  },
+
+  {
+    key: "column",
+    label: "Column",
+  },
+
+  {
+    key: "value",
+    label: "Value",
+  },
+
+  {
+    key: "message",
+    label: "Error",
+  },
+];
+
+const summaryCards = [
+  {
+    label: "Total Rows",
+    field: "totalRows",
+  },
+
+  {
+    label: "Valid Rows",
+    field: "validRows",
+    color: "green",
+  },
+
+  {
+    label: "Invalid Rows",
+    field: "invalidRows",
+    color: "red",
+  },
+
+  {
+    label: "Success Rate",
+    computed: (result) => {
+      if (!result?.totalRows) {
+        return "0%";
+      }
+
+      return `${Math.round((result.validRows / result.totalRows) * 100)}%`;
+    },
+  },
+];
 
 export default function InvoiceSequencePage() {
   const toast = useToast();
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const {
+    isOpen: isImportOpen,
+    onOpen: onImportOpen,
+    onClose: onImportClose,
+  } = useDisclosure();
 
   const [sequences, setSequences] = useState([]);
   const [companies, setCompanies] = useState([]);
@@ -52,6 +178,36 @@ export default function InvoiceSequencePage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedSequence, setSelectedSequence] = useState(null);
+
+  const downloadBlob = (blob, filename) => {
+    const url = window.URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+
+    link.href = url;
+
+    link.download = filename;
+
+    document.body.appendChild(link);
+
+    link.click();
+
+    link.remove();
+
+    window.URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadTemplate = async () => {
+    const blob = await downloadInvoiceSequenceTemplate();
+
+    downloadBlob(blob, "invoice-sequence-template.xlsx");
+  };
+
+  const handleExport = async () => {
+    const blob = await exportInvoiceSequences();
+
+    downloadBlob(blob, "invoice-sequences.xlsx");
+  };
 
   const loadPageData = async ({ silent = false } = {}) => {
     if (silent) {
@@ -148,11 +304,36 @@ export default function InvoiceSequencePage() {
         <Box>
           <Heading size="lg">Invoice Sequences</Heading>
           <Text color="gray.500" mt={1}>
-            Configure company-wise invoice numbering, prefixes, and financial year controls.
+            Configure company-wise invoice numbering, prefixes, and financial
+            year controls.
           </Text>
         </Box>
 
         <HStack spacing={3}>
+          <Button
+            leftIcon={<FileSpreadsheet size={16} />}
+            variant="outline"
+            onClick={handleDownloadTemplate}
+          >
+            Template
+          </Button>
+
+          <Button
+            leftIcon={<Download size={16} />}
+            variant="outline"
+            onClick={handleExport}
+          >
+            Export
+          </Button>
+          <Button
+            leftIcon={<Upload size={16} />}
+            variant="outline"
+            colorScheme="blue"
+            onClick={onImportOpen}
+          >
+            Bulk Import
+          </Button>
+
           <Button
             leftIcon={<RefreshCw size={16} />}
             variant="outline"
@@ -162,13 +343,22 @@ export default function InvoiceSequencePage() {
             Refresh
           </Button>
 
-          <Button leftIcon={<Plus size={16} />} colorScheme="blue" onClick={handleCreate}>
+          <Button
+            leftIcon={<Plus size={16} />}
+            colorScheme="blue"
+            onClick={handleCreate}
+          >
             New Sequence
           </Button>
         </HStack>
       </Flex>
 
-      <Card borderWidth="1px" borderColor="gray.200" shadow="sm" borderRadius="xl">
+      <Card
+        borderWidth="1px"
+        borderColor="gray.200"
+        shadow="sm"
+        borderRadius="xl"
+      >
         <CardBody>
           <Box overflowX="auto">
             {loading ? (
@@ -212,7 +402,10 @@ export default function InvoiceSequencePage() {
                       <Tr key={sequence.id}>
                         <Td>
                           <Stack spacing={0}>
-                            <Text fontWeight="600">{company?.name || `Company #${sequence.companyId}`}</Text>
+                            <Text fontWeight="600">
+                              {company?.name ||
+                                `Company #${sequence.companyId}`}
+                            </Text>
                             <Text fontSize="xs" color="gray.500">
                               ID: {sequence.companyId}
                             </Text>
@@ -224,7 +417,9 @@ export default function InvoiceSequencePage() {
 
                         <Td>
                           <Stack spacing={0}>
-                            <Text fontWeight="600">{sequence.prefix || "—"}</Text>
+                            <Text fontWeight="600">
+                              {sequence.prefix || "—"}
+                            </Text>
                             <Text fontSize="xs" color="gray.500">
                               {sequence.suffix || "No suffix"}
                             </Text>
@@ -243,7 +438,9 @@ export default function InvoiceSequencePage() {
                         <Td>{formatLabel(sequence.resetPolicy)}</Td>
 
                         <Td>
-                          <Badge colorScheme={sequence.active ? "green" : "gray"}>
+                          <Badge
+                            colorScheme={sequence.active ? "green" : "gray"}
+                          >
                             {sequence.active ? "ACTIVE" : "INACTIVE"}
                           </Badge>
                         </Td>
@@ -287,6 +484,24 @@ export default function InvoiceSequencePage() {
         onSuccess={() => loadPageData({ silent: true })}
         sequence={selectedSequence}
         companies={companies}
+      />
+
+      <BulkImportModal
+        isOpen={isImportOpen}
+        onClose={onImportClose}
+        entityName="Invoice Sequence"
+        previewColumns={invoiceSequencePreviewColumns}
+        validationColumns={validationColumns}
+        summaryCards={summaryCards}
+        downloadTemplate={downloadInvoiceSequenceTemplate}
+        downloadErrors={downloadInvoiceSequenceImportErrors}
+        validateImport={validateInvoiceSequenceImport}
+        commitImport={commitInvoiceSequenceImport}
+        onSuccess={() =>
+          loadPageData({
+            silent: true,
+          })
+        }
       />
     </Stack>
   );

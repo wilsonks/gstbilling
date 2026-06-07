@@ -17,8 +17,7 @@ export default function Sidebar({ onNavigate }) {
     }
 
     return (
-      location.pathname === path ||
-      location.pathname.startsWith(`${path}/`)
+      location.pathname === path || location.pathname.startsWith(`${path}/`)
     );
   };
 
@@ -67,11 +66,11 @@ export default function Sidebar({ onNavigate }) {
       </Text>
       <VStack align="stretch" spacing={2} mb={4}>
         <Item label="Companies" path="/companies" />
-        <Item label="Users" path="/users" />
-        <Item label="User Access" path="/user-access" />
         <Item label="Products" path="/products" />
         <Item label="Customers" path="/customers" />
-        <Item label="Invoice Sequences" path="/invoice-sequences" />
+        <Item label="Sequences" path="/invoice-sequences" />
+        <Item label="Users" path="/users" />
+        <Item label="User Access" path="/user-access" />
       </VStack>
 
       <Divider my={4} />

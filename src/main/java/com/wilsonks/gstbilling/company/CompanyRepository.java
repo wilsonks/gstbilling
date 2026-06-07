@@ -53,4 +53,5 @@ public interface CompanyRepository extends JpaRepository<Company, Long> {
 
     List<Company> findTop5ByTenantIdOrderByUpdatedAtDesc(Long tenantId);
 
+    Optional<Company> findByNameIgnoreCase(String companyName);
 }

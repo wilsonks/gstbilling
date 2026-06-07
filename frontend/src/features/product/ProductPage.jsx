@@ -286,7 +286,7 @@ export default function ProductPage() {
     }
   };
 
-  const handleExportProducts = async () => {
+  const handleExport = async () => {
     try {
       const blob = await exportProducts();
 
@@ -425,7 +425,7 @@ export default function ProductPage() {
           <Button
             leftIcon={<Download size={16} />}
             variant="outline"
-            onClick={handleExportProducts}
+            onClick={handleExport}
           >
             Export
           </Button>
