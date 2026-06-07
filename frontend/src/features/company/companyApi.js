@@ -56,3 +56,62 @@ export async function reactivateCompany(id) {
   const response = await api.post(`/api/companies/${id}/reactivate`);
   return response.data;
 }
+
+export async function downloadCompanyTemplate() {
+  const response = await api.get("/api/companies/template", {
+    responseType: "blob",
+  });
+
+  return response.data;
+}
+
+export async function exportCompaniesExcel() {
+  const response = await api.get("/api/companies/export", {
+    responseType: "blob",
+  });
+
+  return response.data;
+}
+
+export async function validateCompanyImport(file) {
+  const formData = new FormData();
+
+  formData.append("file", file);
+
+  const response = await api.post("/api/companies/import/validate", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+
+  return response.data;
+}
+
+export async function commitCompanyImport(file) {
+  const formData = new FormData();
+
+  formData.append("file", file);
+
+  const response = await api.post("/api/companies/import/commit", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+
+  return response.data;
+}
+
+export async function downloadCompanyImportErrors(file) {
+  const formData = new FormData();
+
+  formData.append("file", file);
+
+  const response = await api.post("/api/companies/import/errors", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+    responseType: "blob",
+  });
+
+  return response.data;
+}

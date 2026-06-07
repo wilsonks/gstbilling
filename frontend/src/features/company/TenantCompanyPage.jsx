@@ -28,18 +28,40 @@ import {
   useDisclosure,
   useToast,
 } from "@chakra-ui/react";
-import { Building2, Edit, Plus, Power, RefreshCw } from "lucide-react";
+
+import {
+  Building2,
+  Edit,
+  Plus,
+  Power,
+  RefreshCw,
+  Download,
+  Upload,
+  FileSpreadsheet,
+} from "lucide-react";
+
+import BulkImportModal from "../../components/import/BulkImportModal";
 import TenantCompanyFormModal from "./TenantCompanyFormModal";
 import {
   deactivateCompany,
   getCompanyStats,
   getMyCompanies,
   reactivateCompany,
+  downloadCompanyTemplate,
+  exportCompaniesExcel,
+  validateCompanyImport,
+  commitCompanyImport,
+  downloadCompanyImportErrors,
 } from "./companyApi";
 
 function MetricCard({ label, value, helpText, loading = false }) {
   return (
-    <Card borderWidth="1px" borderColor="gray.200" shadow="sm" borderRadius="xl">
+    <Card
+      borderWidth="1px"
+      borderColor="gray.200"
+      shadow="sm"
+      borderRadius="xl"
+    >
       <CardBody>
         <Stat>
           <StatLabel color="gray.500">{label}</StatLabel>
@@ -59,9 +81,149 @@ function formatCompanyType(value) {
   return value?.replaceAll("_", " ") || "—";
 }
 
+const downloadBlob = (blob, filename) => {
+  const url = window.URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+
+  link.href = url;
+
+  link.download = filename;
+
+  document.body.appendChild(link);
+
+  link.click();
+
+  link.remove();
+
+  window.URL.revokeObjectURL(url);
+};
+
+const handleDownloadTemplate = async () => {
+  const blob = await downloadCompanyTemplate();
+
+  downloadBlob(blob, "company-template.xlsx");
+};
+
+const handleExportCompanies = async () => {
+  const blob = await exportCompaniesExcel();
+
+  downloadBlob(blob, "companies.xlsx");
+};
+
+const companyPreviewColumns = [
+  {
+    label: "Name",
+    dtoField: "name",
+    rawField: "NAME",
+  },
+
+  {
+    label: "Legal Name",
+    dtoField: "legalName",
+    rawField: "LEGAL_NAME",
+  },
+
+  {
+    label: "Trade Name",
+    dtoField: "tradeName",
+    rawField: "TRADE_NAME",
+  },
+
+  {
+    label: "GSTIN",
+    dtoField: "gstin",
+    rawField: "GSTIN",
+  },
+
+  {
+    label: "Type",
+    dtoField: "type",
+    rawField: "TYPE",
+    formatter: (value) => value?.toString().replaceAll("_", " "),
+  },
+
+  {
+    label: "City",
+    dtoField: "city",
+    rawField: "CITY",
+  },
+
+  {
+    label: "State",
+    dtoField: "state",
+    rawField: "STATE",
+  },
+
+  {
+    label: "Active",
+    dtoField: "active",
+    rawField: "ACTIVE",
+    formatter: (value) => (value === true || value === "TRUE" ? "Yes" : "No"),
+  },
+];
+
+const validationColumns = [
+  {
+    key: "rowNumber",
+    label: "Row",
+  },
+
+  {
+    key: "column",
+    label: "Column",
+  },
+
+  {
+    key: "value",
+    label: "Value",
+  },
+
+  {
+    key: "message",
+    label: "Error",
+  },
+];
+
+const summaryCards = [
+  {
+    label: "Total Rows",
+    field: "totalRows",
+  },
+
+  {
+    label: "Valid Rows",
+    field: "validRows",
+    color: "green",
+  },
+
+  {
+    label: "Invalid Rows",
+    field: "invalidRows",
+    color: "red",
+  },
+
+  {
+    label: "Success Rate",
+
+    computed: (result) => {
+      if (!result?.totalRows) {
+        return "0%";
+      }
+
+      return `${Math.round((result.validRows / result.totalRows) * 100)}%`;
+    },
+  },
+];
+
 export default function TenantCompanyPage() {
   const toast = useToast();
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const {
+    isOpen: isImportOpen,
+    onOpen: onImportOpen,
+    onClose: onImportClose,
+  } = useDisclosure();
 
   const [companies, setCompanies] = useState([]);
   const [stats, setStats] = useState({
@@ -100,7 +262,7 @@ export default function TenantCompanyPage() {
           active: 0,
           inactive: 0,
           recentCompanies: [],
-        }
+        },
       );
     } catch (error) {
       toast({
@@ -124,7 +286,9 @@ export default function TenantCompanyPage() {
   }, []);
 
   const typeOptions = useMemo(() => {
-    return [...new Set(companies.map((item) => item.type).filter(Boolean))].sort();
+    return [
+      ...new Set(companies.map((item) => item.type).filter(Boolean)),
+    ].sort();
   }, [companies]);
 
   const filteredCompanies = useMemo(() => {
@@ -133,21 +297,38 @@ export default function TenantCompanyPage() {
     return companies.filter((company) => {
       const matchesQuery =
         !q ||
-        String(company.name || "").toLowerCase().includes(q) ||
-        String(company.legalName || "").toLowerCase().includes(q) ||
-        String(company.tradeName || "").toLowerCase().includes(q) ||
-        String(company.gstin || "").toLowerCase().includes(q) ||
-        String(company.email || "").toLowerCase().includes(q) ||
-        String(company.phone || "").toLowerCase().includes(q) ||
-        String(company.city || "").toLowerCase().includes(q) ||
-        String(company.state || "").toLowerCase().includes(q);
+        String(company.name || "")
+          .toLowerCase()
+          .includes(q) ||
+        String(company.legalName || "")
+          .toLowerCase()
+          .includes(q) ||
+        String(company.tradeName || "")
+          .toLowerCase()
+          .includes(q) ||
+        String(company.gstin || "")
+          .toLowerCase()
+          .includes(q) ||
+        String(company.email || "")
+          .toLowerCase()
+          .includes(q) ||
+        String(company.phone || "")
+          .toLowerCase()
+          .includes(q) ||
+        String(company.city || "")
+          .toLowerCase()
+          .includes(q) ||
+        String(company.state || "")
+          .toLowerCase()
+          .includes(q);
 
       const matchesStatus =
         !statusFilter ||
         (statusFilter === "ACTIVE" && company.active) ||
         (statusFilter === "INACTIVE" && !company.active);
 
-      const matchesType = !typeFilter || String(company.type || "") === typeFilter;
+      const matchesType =
+        !typeFilter || String(company.type || "") === typeFilter;
 
       return matchesQuery && matchesStatus && matchesType;
     });
@@ -212,6 +393,29 @@ export default function TenantCompanyPage() {
 
         <HStack spacing={3}>
           <Button
+            leftIcon={<FileSpreadsheet size={16} />}
+            variant="outline"
+            onClick={handleDownloadTemplate}
+          >
+            Template
+          </Button>
+
+          <Button
+            leftIcon={<Download size={16} />}
+            variant="outline"
+            onClick={handleExportCompanies}
+          >
+            Export
+          </Button>
+          <Button
+            leftIcon={<Upload size={16} />}
+            variant="outline"
+            colorScheme="blue"
+            onClick={onImportOpen}
+          >
+            Bulk Import
+          </Button>
+          <Button
             leftIcon={<RefreshCw size={16} />}
             variant="outline"
             onClick={() => loadPageData({ silent: true })}
@@ -220,7 +424,11 @@ export default function TenantCompanyPage() {
             Refresh
           </Button>
 
-          <Button leftIcon={<Plus size={16} />} colorScheme="blue" onClick={handleCreate}>
+          <Button
+            leftIcon={<Plus size={16} />}
+            colorScheme="blue"
+            onClick={handleCreate}
+          >
             New Company
           </Button>
         </HStack>
@@ -247,7 +455,12 @@ export default function TenantCompanyPage() {
         />
       </SimpleGrid>
 
-      <Card borderWidth="1px" borderColor="gray.200" shadow="sm" borderRadius="xl">
+      <Card
+        borderWidth="1px"
+        borderColor="gray.200"
+        shadow="sm"
+        borderRadius="xl"
+      >
         <CardBody>
           <Stack spacing={4}>
             <SimpleGrid columns={{ base: 1, lg: 3 }} spacing={3}>
@@ -320,7 +533,9 @@ export default function TenantCompanyPage() {
 
                         <Td>
                           <Stack spacing={0}>
-                            <Text fontWeight="600">{company.legalName || "—"}</Text>
+                            <Text fontWeight="600">
+                              {company.legalName || "—"}
+                            </Text>
                             <Text fontSize="xs" color="gray.500">
                               {company.tradeName || "—"}
                             </Text>
@@ -339,7 +554,9 @@ export default function TenantCompanyPage() {
                         <Td>
                           <Stack spacing={0}>
                             <Text>
-                              {[company.city, company.state].filter(Boolean).join(", ") || "—"}
+                              {[company.city, company.state]
+                                .filter(Boolean)
+                                .join(", ") || "—"}
                             </Text>
                             <Text fontSize="xs" color="gray.500">
                               {company.pincode || "—"}
@@ -359,7 +576,9 @@ export default function TenantCompanyPage() {
                         <Td>{formatCompanyType(company.type)}</Td>
 
                         <Td>
-                          <Badge colorScheme={company.active ? "green" : "gray"}>
+                          <Badge
+                            colorScheme={company.active ? "green" : "gray"}
+                          >
                             {company.active ? "ACTIVE" : "INACTIVE"}
                           </Badge>
                         </Td>
@@ -378,7 +597,11 @@ export default function TenantCompanyPage() {
                               variant="outline"
                               colorScheme={company.active ? "red" : "green"}
                               icon={<Power size={16} />}
-                              aria-label={company.active ? "Deactivate company" : "Reactivate company"}
+                              aria-label={
+                                company.active
+                                  ? "Deactivate company"
+                                  : "Reactivate company"
+                              }
                               onClick={() => handleToggleStatus(company)}
                             />
                           </HStack>
@@ -398,6 +621,24 @@ export default function TenantCompanyPage() {
         onClose={handleModalClose}
         onSuccess={() => loadPageData({ silent: true })}
         company={selectedCompany}
+      />
+
+      <BulkImportModal
+        isOpen={isImportOpen}
+        onClose={onImportClose}
+        entityName="Company"
+        previewColumns={companyPreviewColumns}
+        validationColumns={validationColumns}
+        summaryCards={summaryCards}
+        downloadTemplate={downloadCompanyTemplate}
+        downloadErrors={downloadCompanyImportErrors}
+        validateImport={validateCompanyImport}
+        commitImport={commitCompanyImport}
+        onSuccess={() =>
+          loadPageData({
+            silent: true,
+          })
+        }
       />
     </Stack>
   );
