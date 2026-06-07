@@ -1,9 +1,14 @@
 package com.wilsonks.gstbilling.product;
 
+import com.wilsonks.gstbilling.product.imports.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -13,6 +18,15 @@ import java.util.List;
 public class ProductController {
 
     private final ProductService service;
+
+    private final ProductExportService exportService;
+
+    private final ProductTemplateService templateService;
+
+    private final ProductImportService importService;
+
+    private final ProductImportErrorExportService errorExportService;
+
 
     @PostMapping
     public ProductDto create(@RequestBody ProductDto dto) {
@@ -30,10 +44,7 @@ public class ProductController {
     }
 
     @GetMapping
-    public Page<ProductDto> list(
-            @RequestParam(required = false) String q,
-            Pageable pageable
-    ) {
+    public Page<ProductDto> list(@RequestParam(required = false) String q, Pageable pageable) {
         return service.list(q, pageable);
     }
 
@@ -56,4 +67,35 @@ public class ProductController {
     public ProductDto reactivate(@PathVariable Long id) {
         return service.reactivate(id);
     }
+
+    @PostMapping(value = "/import/validate", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ProductImportValidationResult validate(@RequestParam("file") MultipartFile file) {
+
+        return importService.validate(file);
+    }
+
+    @PostMapping(value = "/import/commit", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ProductImportCommitResult commit(@RequestParam("file") MultipartFile file) {
+
+        return importService.commit(file);
+    }
+
+    @GetMapping(value = "/template", produces = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    public ResponseEntity<byte[]> template() {
+
+        return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=product-template.xlsx").body(templateService.generateTemplate());
+    }
+
+    @GetMapping(value = "/export", produces = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    public ResponseEntity<byte[]> export() {
+
+        return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=products.xlsx").body(exportService.exportProducts());
+    }
+
+    @PostMapping(value = "/import/errors", produces = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    public ResponseEntity<byte[]> downloadErrors(@RequestParam("file") MultipartFile file) {
+
+        return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=product-import-errors.xlsx").body(errorExportService.exportErrors(file));
+    }
+
 }

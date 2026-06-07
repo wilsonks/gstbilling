@@ -28,13 +28,29 @@ import {
   useDisclosure,
   useToast,
 } from "@chakra-ui/react";
-import { Edit, Package, Plus, Power, RefreshCw } from "lucide-react";
+import {
+  Edit,
+  Plus,
+  Power,
+  RefreshCw,
+  Package,
+  Download,
+  Upload,
+  FileSpreadsheet,
+} from "lucide-react";
 import ProductFormModal from "./ProductFormModal";
+import BulkImportModal from "../../components/import/BulkImportModal";
+
 import {
   deactivateProduct,
   getProducts,
   getProductStats,
   reactivateProduct,
+  downloadProductTemplate,
+  downloadProductImportErrors,
+  validateProductImport,
+  commitProductImport,
+  exportProducts,
 } from "./productApi";
 
 function formatCurrency(value) {
@@ -47,7 +63,12 @@ function formatCurrency(value) {
 
 function MetricCard({ label, value, helpText, loading = false }) {
   return (
-    <Card borderWidth="1px" borderColor="gray.200" shadow="sm" borderRadius="xl">
+    <Card
+      borderWidth="1px"
+      borderColor="gray.200"
+      shadow="sm"
+      borderRadius="xl"
+    >
       <CardBody>
         <Stat>
           <StatLabel color="gray.500">{label}</StatLabel>
@@ -66,6 +87,11 @@ function MetricCard({ label, value, helpText, loading = false }) {
 export default function ProductPage() {
   const toast = useToast();
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const {
+    isOpen: isImportOpen,
+    onOpen: onImportOpen,
+    onClose: onImportClose,
+  } = useDisclosure();
 
   const [products, setProducts] = useState([]);
   const [stats, setStats] = useState({
@@ -105,7 +131,7 @@ export default function ProductPage() {
           active: 0,
           inactive: 0,
           recentProducts: [],
-        }
+        },
       );
     } catch (error) {
       toast({
@@ -129,12 +155,19 @@ export default function ProductPage() {
   }, []);
 
   const gstOptions = useMemo(() => {
-    return [...new Set(products.map((item) => item.gstRate).filter((v) => v !== null && v !== undefined))]
-      .sort((a, b) => Number(a) - Number(b));
+    return [
+      ...new Set(
+        products
+          .map((item) => item.gstRate)
+          .filter((v) => v !== null && v !== undefined),
+      ),
+    ].sort((a, b) => Number(a) - Number(b));
   }, [products]);
 
   const unitOptions = useMemo(() => {
-    return [...new Set(products.map((item) => item.unitCode).filter(Boolean))].sort();
+    return [
+      ...new Set(products.map((item) => item.unitCode).filter(Boolean)),
+    ].sort();
   }, [products]);
 
   const filteredProducts = useMemo(() => {
@@ -143,13 +176,27 @@ export default function ProductPage() {
     return products.filter((product) => {
       const matchesQuery =
         !q ||
-        String(product.code || "").toLowerCase().includes(q) ||
-        String(product.name || "").toLowerCase().includes(q) ||
-        String(product.description || "").toLowerCase().includes(q) ||
-        String(product.hsnSacCode || "").toLowerCase().includes(q) ||
-        String(product.hsnSacDescription || "").toLowerCase().includes(q) ||
-        String(product.unitCode || "").toLowerCase().includes(q) ||
-        String(product.gstSlabCode || "").toLowerCase().includes(q);
+        String(product.code || "")
+          .toLowerCase()
+          .includes(q) ||
+        String(product.name || "")
+          .toLowerCase()
+          .includes(q) ||
+        String(product.description || "")
+          .toLowerCase()
+          .includes(q) ||
+        String(product.hsnSacCode || "")
+          .toLowerCase()
+          .includes(q) ||
+        String(product.hsnSacDescription || "")
+          .toLowerCase()
+          .includes(q) ||
+        String(product.unitCode || "")
+          .toLowerCase()
+          .includes(q) ||
+        String(product.gstSlabCode || "")
+          .toLowerCase()
+          .includes(q);
 
       const matchesStatus =
         !statusFilter ||
@@ -208,6 +255,148 @@ export default function ProductPage() {
     }
   };
 
+  const downloadBlob = (blob, filename) => {
+    const url = window.URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+
+    link.href = url;
+
+    link.download = filename;
+
+    document.body.appendChild(link);
+
+    link.click();
+
+    link.remove();
+
+    window.URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadTemplate = async () => {
+    try {
+      const blob = await downloadProductTemplate();
+
+      downloadBlob(blob, "product-template.xlsx");
+    } catch (error) {
+      toast({
+        title: "Failed to download template",
+        status: "error",
+      });
+    }
+  };
+
+  const handleExportProducts = async () => {
+    try {
+      const blob = await exportProducts();
+
+      downloadBlob(blob, "products.xlsx");
+    } catch (error) {
+      toast({
+        title: "Failed to export products",
+        status: "error",
+      });
+    }
+  };
+
+  const productPreviewColumns = [
+    {
+      label: "Code",
+      dtoField: "code",
+      rawField: "CODE",
+    },
+
+    {
+      label: "Name",
+      dtoField: "name",
+      rawField: "NAME",
+    },
+
+    {
+      label: "HSN",
+      dtoField: "hsnSacCode",
+      rawField: "HSN_SAC_CODE",
+    },
+
+    {
+      label: "Unit",
+      dtoField: "unitCode",
+      rawField: "UNIT_CODE",
+    },
+
+    {
+      label: "GST Slab",
+      dtoField: "gstSlabCode",
+      rawField: "GST_SLAB_CODE",
+    },
+
+    {
+      label: "Price",
+      dtoField: "defaultPrice",
+      rawField: "DEFAULT_PRICE",
+      formatter: (value) => (value == null ? "-" : Number(value).toFixed(2)),
+    },
+
+    {
+      label: "Active",
+      dtoField: "active",
+      rawField: "ACTIVE",
+      formatter: (value) => (value === true || value === "TRUE" ? "Yes" : "No"),
+    },
+  ];
+
+  const validationColumns = [
+    {
+      key: "rowNumber",
+      label: "Row",
+    },
+
+    {
+      key: "column",
+      label: "Column",
+    },
+
+    {
+      key: "value",
+      label: "Value",
+    },
+
+    {
+      key: "message",
+      label: "Error",
+    },
+  ];
+
+  const summaryCards = [
+    {
+      label: "Total Rows",
+      field: "totalRows",
+    },
+
+    {
+      label: "Valid Rows",
+      field: "validRows",
+      color: "green",
+    },
+
+    {
+      label: "Invalid Rows",
+      field: "invalidRows",
+      color: "red",
+    },
+
+    {
+      label: "Success Rate",
+      computed: (result) => {
+        if (!result?.totalRows) {
+          return "0%";
+        }
+
+        return `${Math.round((result.validRows / result.totalRows) * 100)}%`;
+      },
+    },
+  ];
+
   return (
     <Stack spacing={6}>
       <Flex
@@ -219,11 +408,37 @@ export default function ProductPage() {
         <Box>
           <Heading size="lg">Products</Heading>
           <Text color="gray.500" mt={1}>
-            Manage tenant product catalog with standardized HSN/SAC, unit, and GST slab references.
+            Manage tenant product catalog with standardized HSN/SAC, unit, and
+            GST slab references.
           </Text>
         </Box>
 
         <HStack spacing={3}>
+          <Button
+            leftIcon={<FileSpreadsheet size={16} />}
+            variant="outline"
+            onClick={handleDownloadTemplate}
+          >
+            Template
+          </Button>
+
+          <Button
+            leftIcon={<Download size={16} />}
+            variant="outline"
+            onClick={handleExportProducts}
+          >
+            Export
+          </Button>
+
+          <Button
+            leftIcon={<Upload size={16} />}
+            variant="outline"
+            colorScheme="blue"
+            onClick={onImportOpen}
+          >
+            Bulk Import
+          </Button>
+
           <Button
             leftIcon={<RefreshCw size={16} />}
             variant="outline"
@@ -233,7 +448,11 @@ export default function ProductPage() {
             Refresh
           </Button>
 
-          <Button leftIcon={<Plus size={16} />} colorScheme="blue" onClick={handleCreate}>
+          <Button
+            leftIcon={<Plus size={16} />}
+            colorScheme="blue"
+            onClick={handleCreate}
+          >
             New Product
           </Button>
         </HStack>
@@ -260,7 +479,12 @@ export default function ProductPage() {
         />
       </SimpleGrid>
 
-      <Card borderWidth="1px" borderColor="gray.200" shadow="sm" borderRadius="xl">
+      <Card
+        borderWidth="1px"
+        borderColor="gray.200"
+        shadow="sm"
+        borderRadius="xl"
+      >
         <CardBody>
           <Stack spacing={4}>
             <SimpleGrid columns={{ base: 1, lg: 4 }} spacing={3}>
@@ -357,7 +581,9 @@ export default function ProductPage() {
 
                         <Td>
                           <Stack spacing={0}>
-                            <Text fontWeight="600">{product.hsnSacCode || "—"}</Text>
+                            <Text fontWeight="600">
+                              {product.hsnSacCode || "—"}
+                            </Text>
                             <Text fontSize="xs" color="gray.500" noOfLines={2}>
                               {product.hsnSacDescription || ""}
                             </Text>
@@ -366,7 +592,9 @@ export default function ProductPage() {
 
                         <Td>
                           <Stack spacing={0}>
-                            <Text fontWeight="600">{product.unitCode || "—"}</Text>
+                            <Text fontWeight="600">
+                              {product.unitCode || "—"}
+                            </Text>
                             <Text fontSize="xs" color="gray.500">
                               {product.unitName || ""}
                             </Text>
@@ -375,19 +603,27 @@ export default function ProductPage() {
 
                         <Td>
                           <Stack spacing={0}>
-                            <Text fontWeight="600">{product.gstSlabCode || "—"}</Text>
+                            <Text fontWeight="600">
+                              {product.gstSlabCode || "—"}
+                            </Text>
                             <Text fontSize="xs" color="gray.500">
                               {product.gstSlabName || ""}
                             </Text>
                           </Stack>
                         </Td>
 
-                        <Td isNumeric>{Number(product.gstRate || 0).toFixed(2)}%</Td>
+                        <Td isNumeric>
+                          {Number(product.gstRate || 0).toFixed(2)}%
+                        </Td>
 
-                        <Td isNumeric>{formatCurrency(product.defaultPrice)}</Td>
+                        <Td isNumeric>
+                          {formatCurrency(product.defaultPrice)}
+                        </Td>
 
                         <Td>
-                          <Badge colorScheme={product.active ? "green" : "gray"}>
+                          <Badge
+                            colorScheme={product.active ? "green" : "gray"}
+                          >
                             {product.active ? "ACTIVE" : "INACTIVE"}
                           </Badge>
                         </Td>
@@ -406,7 +642,11 @@ export default function ProductPage() {
                               variant="outline"
                               colorScheme={product.active ? "red" : "green"}
                               icon={<Power size={16} />}
-                              aria-label={product.active ? "Deactivate product" : "Reactivate product"}
+                              aria-label={
+                                product.active
+                                  ? "Deactivate product"
+                                  : "Reactivate product"
+                              }
                               onClick={() => handleToggleStatus(product)}
                             />
                           </HStack>
@@ -426,6 +666,24 @@ export default function ProductPage() {
         onClose={handleModalClose}
         onSuccess={() => loadPageData({ silent: true })}
         product={selectedProduct}
+      />
+
+      <BulkImportModal
+        isOpen={isImportOpen}
+        onClose={onImportClose}
+        entityName="Product"
+        previewColumns={productPreviewColumns}
+        validationColumns={validationColumns}
+        summaryCards={summaryCards}
+        downloadTemplate={downloadProductTemplate}
+        downloadErrors={downloadProductImportErrors}
+        validateImport={validateProductImport}
+        commitImport={commitProductImport}
+        onSuccess={() =>
+          loadPageData({
+            silent: true,
+          })
+        }
       />
     </Stack>
   );

@@ -71,3 +71,59 @@ export async function getGstSlabMasters() {
   const response = await api.get("/api/masters/gst-slabs");
   return response.data || [];
 }
+
+export async function downloadProductTemplate() {
+  const response = await api.get("/api/products/template", {
+    responseType: "blob",
+  });
+
+  return response.data;
+}
+export async function exportProducts() {
+  const response = await api.get("/api/products/export", {
+    responseType: "blob",
+  });
+
+  return response.data;
+}
+export async function validateProductImport(file) {
+  const formData = new FormData();
+
+  formData.append("file", file);
+
+  const response = await api.post("/api/products/import/validate", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+
+  return response.data;
+}
+
+export async function commitProductImport(file) {
+  const formData = new FormData();
+
+  formData.append("file", file);
+
+  const response = await api.post("/api/products/import/commit", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+
+  return response.data;
+}
+export async function downloadProductImportErrors(file) {
+  const formData = new FormData();
+
+  formData.append("file", file);
+
+  const response = await api.post("/api/products/import/errors", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+    responseType: "blob",
+  });
+
+  return response.data;
+}
