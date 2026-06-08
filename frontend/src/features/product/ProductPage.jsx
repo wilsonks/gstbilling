@@ -40,7 +40,9 @@ import {
 } from "lucide-react";
 import ProductFormModal from "./ProductFormModal";
 import BulkImportModal from "../../components/import/BulkImportModal";
-
+import PageHeader from "../../layout/PageHeader";
+import PageCard from "../../layout/PageCard";
+import MetricCard from "../../layout/MetricCard";
 import {
   deactivateProduct,
   getProducts,
@@ -53,35 +55,14 @@ import {
   exportProducts,
 } from "./productApi";
 
+import { downloadBlob } from "../../utils/fileDownload";
+
 function formatCurrency(value) {
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: "INR",
     maximumFractionDigits: 2,
   }).format(Number(value || 0));
-}
-
-function MetricCard({ label, value, helpText, loading = false }) {
-  return (
-    <Card
-      borderWidth="1px"
-      borderColor="gray.200"
-      shadow="sm"
-      borderRadius="xl"
-    >
-      <CardBody>
-        <Stat>
-          <StatLabel color="gray.500">{label}</StatLabel>
-          <StatNumber fontSize="2xl">
-            {loading ? <Skeleton height="30px" width="100px" /> : value}
-          </StatNumber>
-          <StatHelpText mb="0">
-            {loading ? <Skeleton height="16px" width="160px" /> : helpText}
-          </StatHelpText>
-        </Stat>
-      </CardBody>
-    </Card>
-  );
 }
 
 export default function ProductPage() {
@@ -255,24 +236,6 @@ export default function ProductPage() {
     }
   };
 
-  const downloadBlob = (blob, filename) => {
-    const url = window.URL.createObjectURL(blob);
-
-    const link = document.createElement("a");
-
-    link.href = url;
-
-    link.download = filename;
-
-    document.body.appendChild(link);
-
-    link.click();
-
-    link.remove();
-
-    window.URL.revokeObjectURL(url);
-  };
-
   const handleDownloadTemplate = async () => {
     try {
       const blob = await downloadProductTemplate();
@@ -399,65 +362,59 @@ export default function ProductPage() {
 
   return (
     <Stack spacing={6}>
-      <Flex
-        justify="space-between"
-        align={{ base: "stretch", md: "center" }}
-        direction={{ base: "column", md: "row" }}
-        gap={4}
-      >
-        <Box>
-          <Heading size="lg">Products</Heading>
-          <Text color="gray.500" mt={1}>
-            Manage tenant product catalog with standardized HSN/SAC, unit, and
-            GST slab references.
-          </Text>
-        </Box>
+      <PageHeader
+        title="Products"
+        subtitle="Manage tenant product catalog with standardized HSN/SAC, unit and GST slab references."
+        actions={
+          <>
+            <Button
+              leftIcon={<FileSpreadsheet size={16} />}
+              variant="outline"
+              onClick={handleDownloadTemplate}
+            >
+              Template
+            </Button>
 
-        <HStack spacing={3}>
-          <Button
-            leftIcon={<FileSpreadsheet size={16} />}
-            variant="outline"
-            onClick={handleDownloadTemplate}
-          >
-            Template
-          </Button>
+            <Button
+              leftIcon={<Download size={16} />}
+              variant="outline"
+              onClick={handleExport}
+            >
+              Export
+            </Button>
 
-          <Button
-            leftIcon={<Download size={16} />}
-            variant="outline"
-            onClick={handleExport}
-          >
-            Export
-          </Button>
+            <Button
+              leftIcon={<Upload size={16} />}
+              variant="outline"
+              colorScheme="blue"
+              onClick={onImportOpen}
+            >
+              Bulk Import
+            </Button>
 
-          <Button
-            leftIcon={<Upload size={16} />}
-            variant="outline"
-            colorScheme="blue"
-            onClick={onImportOpen}
-          >
-            Bulk Import
-          </Button>
+            <Button
+              leftIcon={<RefreshCw size={16} />}
+              variant="outline"
+              onClick={() =>
+                loadPageData({
+                  silent: true,
+                })
+              }
+              isLoading={refreshing}
+            >
+              Refresh
+            </Button>
 
-          <Button
-            leftIcon={<RefreshCw size={16} />}
-            variant="outline"
-            onClick={() => loadPageData({ silent: true })}
-            isLoading={refreshing}
-          >
-            Refresh
-          </Button>
-
-          <Button
-            leftIcon={<Plus size={16} />}
-            colorScheme="blue"
-            onClick={handleCreate}
-          >
-            New Product
-          </Button>
-        </HStack>
-      </Flex>
-
+            <Button
+              leftIcon={<Plus size={16} />}
+              colorScheme="blue"
+              onClick={handleCreate}
+            >
+              New Product
+            </Button>
+          </>
+        }
+      />
       <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
         <MetricCard
           label="Total Products"
@@ -479,12 +436,7 @@ export default function ProductPage() {
         />
       </SimpleGrid>
 
-      <Card
-        borderWidth="1px"
-        borderColor="gray.200"
-        shadow="sm"
-        borderRadius="xl"
-      >
+      <PageCard>
         <CardBody>
           <Stack spacing={4}>
             <SimpleGrid columns={{ base: 1, lg: 4 }} spacing={3}>
@@ -537,8 +489,10 @@ export default function ProductPage() {
                   <Skeleton height="56px" />
                 </Stack>
               ) : filteredProducts.length === 0 ? (
-                <Box py={10} textAlign="center">
-                  <Package size={28} />
+                <Box py={16} textAlign="center">
+                  <Box display="flex" justifyContent="center">
+                    <Package size={40} />
+                  </Box>
                   <Text fontWeight="600" mt={3}>
                     No products found
                   </Text>
@@ -661,7 +615,7 @@ export default function ProductPage() {
             </Box>
           </Stack>
         </CardBody>
-      </Card>
+      </PageCard>
 
       <ProductFormModal
         isOpen={isOpen}

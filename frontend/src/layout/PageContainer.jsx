@@ -1,5 +1,7 @@
 import React from "react";
-import { Box } from "@chakra-ui/react";
+
+import { Box, Container } from "@chakra-ui/react";
+
 import Breadcrumbs from "./Breadcrumbs";
 
 export default function PageContainer({ children }) {
@@ -7,12 +9,25 @@ export default function PageContainer({ children }) {
     <Box
       flex="1"
       overflowX="hidden"
-      p={{ base: 3, md: 6 }}
-      pb={{ base: "80px", md: 6 }} // bottom nav spacing
+      bg="gray.50"
+      px={{
+        base: 3,
+        md: 6,
+      }}
+      py={{
+        base: 3,
+        md: 5,
+      }}
+      pb={{
+        base: "90px",
+        md: 6,
+      }}
     >
-      <Breadcrumbs />
+      <Container maxW="100%" px={0}>
+        <Breadcrumbs />
 
-      {children}
+        <Box mt={4}>{children}</Box>
+      </Container>
     </Box>
   );
 }

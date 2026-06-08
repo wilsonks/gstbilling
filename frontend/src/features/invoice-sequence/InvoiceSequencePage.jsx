@@ -11,6 +11,7 @@ import {
   IconButton,
   Skeleton,
   Stack,
+  SimpleGrid,
   Table,
   Tbody,
   Td,
@@ -33,6 +34,10 @@ import {
 } from "lucide-react";
 import InvoiceSequenceModal from "./InvoiceSequenceModal";
 import BulkImportModal from "../../components/import/BulkImportModal";
+import PageHeader from "../../layout/PageHeader";
+import PageCard from "../../layout/PageCard";
+import MetricCard from "../../layout/MetricCard";
+
 import {
   deactivateInvoiceSequence,
   getInvoiceSequences,
@@ -44,6 +49,8 @@ import {
   downloadInvoiceSequenceImportErrors,
 } from "./invoiceSequenceApi";
 import { getMyCompanies } from "../company/companyApi";
+
+import { downloadBlob } from "../../utils/fileDownload";
 
 function formatLabel(value) {
   return value?.replaceAll("_", " ") || "—";
@@ -179,24 +186,6 @@ export default function InvoiceSequencePage() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedSequence, setSelectedSequence] = useState(null);
 
-  const downloadBlob = (blob, filename) => {
-    const url = window.URL.createObjectURL(blob);
-
-    const link = document.createElement("a");
-
-    link.href = url;
-
-    link.download = filename;
-
-    document.body.appendChild(link);
-
-    link.click();
-
-    link.remove();
-
-    window.URL.revokeObjectURL(url);
-  };
-
   const handleDownloadTemplate = async () => {
     const blob = await downloadInvoiceSequenceTemplate();
 
@@ -295,70 +284,88 @@ export default function InvoiceSequencePage() {
 
   return (
     <Stack spacing={6}>
-      <Flex
-        justify="space-between"
-        align={{ base: "stretch", md: "center" }}
-        direction={{ base: "column", md: "row" }}
-        gap={4}
+      <PageHeader
+        title="Invoice Sequences"
+        subtitle="Configure company-wise invoice numbering, prefixes, and financial year controls."
+        actions={
+          <>
+            <Button
+              leftIcon={<FileSpreadsheet size={16} />}
+              variant="outline"
+              onClick={handleDownloadTemplate}
+            >
+              Template
+            </Button>
+
+            <Button
+              leftIcon={<Download size={16} />}
+              variant="outline"
+              onClick={handleExport}
+            >
+              Export
+            </Button>
+
+            <Button
+              leftIcon={<Upload size={16} />}
+              variant="outline"
+              colorScheme="blue"
+              onClick={onImportOpen}
+            >
+              Bulk Import
+            </Button>
+
+            <Button
+              leftIcon={<RefreshCw size={16} />}
+              variant="outline"
+              onClick={() =>
+                loadPageData({
+                  silent: true,
+                })
+              }
+              isLoading={refreshing}
+            >
+              Refresh
+            </Button>
+
+            <Button
+              leftIcon={<Plus size={16} />}
+              colorScheme="blue"
+              onClick={handleCreate}
+            >
+              New Sequence
+            </Button>
+          </>
+        }
+      />
+      <SimpleGrid
+        columns={{
+          base: 1,
+          md: 3,
+        }}
+        spacing={4}
       >
-        <Box>
-          <Heading size="lg">Invoice Sequences</Heading>
-          <Text color="gray.500" mt={1}>
-            Configure company-wise invoice numbering, prefixes, and financial
-            year controls.
-          </Text>
-        </Box>
+        <MetricCard
+          label="Total Sequences"
+          value={sequences.length}
+          helpText="Configured invoice sequences"
+          loading={loading}
+        />
 
-        <HStack spacing={3}>
-          <Button
-            leftIcon={<FileSpreadsheet size={16} />}
-            variant="outline"
-            onClick={handleDownloadTemplate}
-          >
-            Template
-          </Button>
+        <MetricCard
+          label="Active Sequences"
+          value={sequences.filter((s) => s.active).length}
+          helpText="Available for document generation"
+          loading={loading}
+        />
 
-          <Button
-            leftIcon={<Download size={16} />}
-            variant="outline"
-            onClick={handleExport}
-          >
-            Export
-          </Button>
-          <Button
-            leftIcon={<Upload size={16} />}
-            variant="outline"
-            colorScheme="blue"
-            onClick={onImportOpen}
-          >
-            Bulk Import
-          </Button>
-
-          <Button
-            leftIcon={<RefreshCw size={16} />}
-            variant="outline"
-            onClick={() => loadPageData({ silent: true })}
-            isLoading={refreshing}
-          >
-            Refresh
-          </Button>
-
-          <Button
-            leftIcon={<Plus size={16} />}
-            colorScheme="blue"
-            onClick={handleCreate}
-          >
-            New Sequence
-          </Button>
-        </HStack>
-      </Flex>
-
-      <Card
-        borderWidth="1px"
-        borderColor="gray.200"
-        shadow="sm"
-        borderRadius="xl"
-      >
+        <MetricCard
+          label="Companies"
+          value={companies.length}
+          helpText="Companies with invoice numbering"
+          loading={loading}
+        />
+      </SimpleGrid>
+      <PageCard>
         <CardBody>
           <Box overflowX="auto">
             {loading ? (
@@ -369,8 +376,8 @@ export default function InvoiceSequencePage() {
                 <Skeleton height="56px" />
               </Stack>
             ) : sequences.length === 0 ? (
-              <Box py={10} textAlign="center">
-                <Hash size={28} style={{ margin: "0 auto" }} />
+              <Box py={16} textAlign="center">
+                <Hash size={40} style={{ margin: "0 auto" }} />
                 <Text fontWeight="600" mt={3}>
                   No invoice sequences found
                 </Text>
@@ -479,7 +486,7 @@ export default function InvoiceSequencePage() {
             )}
           </Box>
         </CardBody>
-      </Card>
+      </PageCard>
 
       <InvoiceSequenceModal
         isOpen={isOpen}

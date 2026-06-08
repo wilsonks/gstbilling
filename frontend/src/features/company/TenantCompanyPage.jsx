@@ -42,6 +42,10 @@ import {
 
 import BulkImportModal from "../../components/import/BulkImportModal";
 import TenantCompanyFormModal from "./TenantCompanyFormModal";
+import PageHeader from "../../layout/PageHeader";
+import PageCard from "../../layout/PageCard";
+import MetricCard from "../../layout/MetricCard";
+
 import {
   deactivateCompany,
   getCompanyStats,
@@ -54,62 +58,11 @@ import {
   downloadCompanyImportErrors,
 } from "./companyApi";
 
-function MetricCard({ label, value, helpText, loading = false }) {
-  return (
-    <Card
-      borderWidth="1px"
-      borderColor="gray.200"
-      shadow="sm"
-      borderRadius="xl"
-    >
-      <CardBody>
-        <Stat>
-          <StatLabel color="gray.500">{label}</StatLabel>
-          <StatNumber fontSize="2xl">
-            {loading ? <Skeleton height="30px" width="100px" /> : value}
-          </StatNumber>
-          <StatHelpText mb="0">
-            {loading ? <Skeleton height="16px" width="160px" /> : helpText}
-          </StatHelpText>
-        </Stat>
-      </CardBody>
-    </Card>
-  );
-}
+import { downloadBlob } from "../../utils/fileDownload";
 
 function formatCompanyType(value) {
   return value?.replaceAll("_", " ") || "—";
 }
-
-const downloadBlob = (blob, filename) => {
-  const url = window.URL.createObjectURL(blob);
-
-  const link = document.createElement("a");
-
-  link.href = url;
-
-  link.download = filename;
-
-  document.body.appendChild(link);
-
-  link.click();
-
-  link.remove();
-
-  window.URL.revokeObjectURL(url);
-};
-
-const handleDownloadTemplate = async () => {
-  const blob = await downloadCompanyTemplate();
-
-  downloadBlob(blob, "company-template.xlsx");
-};
-
-const handleExport = async () => {
-  const blob = await exportCompaniesExcel();
-
-  downloadBlob(blob, "companies.xlsx");
-};
 
 const companyPreviewColumns = [
   {
@@ -334,6 +287,18 @@ export default function TenantCompanyPage() {
     });
   }, [companies, query, statusFilter, typeFilter]);
 
+  const handleDownloadTemplate = async () => {
+    const blob = await downloadCompanyTemplate();
+
+    downloadBlob(blob, "company-template.xlsx");
+  };
+
+  const handleExport = async () => {
+    const blob = await exportCompaniesExcel();
+
+    downloadBlob(blob, "companies.xlsx");
+  };
+
   const handleCreate = () => {
     setSelectedCompany(null);
     onOpen();
@@ -378,61 +343,59 @@ export default function TenantCompanyPage() {
 
   return (
     <Stack spacing={6}>
-      <Flex
-        justify="space-between"
-        align={{ base: "stretch", md: "center" }}
-        direction={{ base: "column", md: "row" }}
-        gap={4}
-      >
-        <Box>
-          <Heading size="lg">Companies</Heading>
-          <Text color="gray.500" mt={1}>
-            Manage invoice-ready company profiles for the active tenant.
-          </Text>
-        </Box>
+      <PageHeader
+        title="Companies"
+        subtitle="Manage invoice-ready company profiles for the active tenant."
+        actions={
+          <>
+            <Button
+              leftIcon={<FileSpreadsheet size={16} />}
+              variant="outline"
+              onClick={handleDownloadTemplate}
+            >
+              Template
+            </Button>
 
-        <HStack spacing={3}>
-          <Button
-            leftIcon={<FileSpreadsheet size={16} />}
-            variant="outline"
-            onClick={handleDownloadTemplate}
-          >
-            Template
-          </Button>
+            <Button
+              leftIcon={<Download size={16} />}
+              variant="outline"
+              onClick={handleExport}
+            >
+              Export
+            </Button>
 
-          <Button
-            leftIcon={<Download size={16} />}
-            variant="outline"
-            onClick={handleExport}
-          >
-            Export
-          </Button>
-          <Button
-            leftIcon={<Upload size={16} />}
-            variant="outline"
-            colorScheme="blue"
-            onClick={onImportOpen}
-          >
-            Bulk Import
-          </Button>
-          <Button
-            leftIcon={<RefreshCw size={16} />}
-            variant="outline"
-            onClick={() => loadPageData({ silent: true })}
-            isLoading={refreshing}
-          >
-            Refresh
-          </Button>
+            <Button
+              leftIcon={<Upload size={16} />}
+              variant="outline"
+              colorScheme="blue"
+              onClick={onImportOpen}
+            >
+              Bulk Import
+            </Button>
 
-          <Button
-            leftIcon={<Plus size={16} />}
-            colorScheme="blue"
-            onClick={handleCreate}
-          >
-            New Company
-          </Button>
-        </HStack>
-      </Flex>
+            <Button
+              leftIcon={<RefreshCw size={16} />}
+              variant="outline"
+              onClick={() =>
+                loadPageData({
+                  silent: true,
+                })
+              }
+              isLoading={refreshing}
+            >
+              Refresh
+            </Button>
+
+            <Button
+              leftIcon={<Plus size={16} />}
+              colorScheme="blue"
+              onClick={handleCreate}
+            >
+              New Company
+            </Button>
+          </>
+        }
+      />
 
       <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
         <MetricCard
@@ -455,12 +418,7 @@ export default function TenantCompanyPage() {
         />
       </SimpleGrid>
 
-      <Card
-        borderWidth="1px"
-        borderColor="gray.200"
-        shadow="sm"
-        borderRadius="xl"
-      >
+      <PageCard>
         <CardBody>
           <Stack spacing={4}>
             <SimpleGrid columns={{ base: 1, lg: 3 }} spacing={3}>
@@ -501,8 +459,8 @@ export default function TenantCompanyPage() {
                   <Skeleton height="56px" />
                 </Stack>
               ) : filteredCompanies.length === 0 ? (
-                <Box py={10} textAlign="center">
-                  <Building2 size={28} style={{ margin: "0 auto" }} />
+                <Box py={16} textAlign="center">
+                  <Building2 size={40} style={{ margin: "0 auto" }} />
                   <Text fontWeight="600" mt={3}>
                     No companies found
                   </Text>
@@ -617,7 +575,7 @@ export default function TenantCompanyPage() {
             </Box>
           </Stack>
         </CardBody>
-      </Card>
+      </PageCard>
 
       <TenantCompanyFormModal
         isOpen={isOpen}

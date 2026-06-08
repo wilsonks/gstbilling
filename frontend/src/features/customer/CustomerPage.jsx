@@ -40,6 +40,10 @@ import {
 } from "lucide-react";
 import CustomerFormModal from "./CustomerFormModal";
 import BulkImportModal from "../../components/import/BulkImportModal";
+import PageHeader from "../../layout/PageHeader";
+import PageCard from "../../layout/PageCard";
+import MetricCard from "../../layout/MetricCard";
+
 import {
   deactivateCustomer,
   getCustomerStats,
@@ -53,29 +57,6 @@ import {
 } from "./customerApi";
 
 import { downloadBlob } from "../../utils/fileDownload";
-
-function MetricCard({ label, value, helpText, loading = false }) {
-  return (
-    <Card
-      borderWidth="1px"
-      borderColor="gray.200"
-      shadow="sm"
-      borderRadius="xl"
-    >
-      <CardBody>
-        <Stat>
-          <StatLabel color="gray.500">{label}</StatLabel>
-          <StatNumber fontSize="2xl">
-            {loading ? <Skeleton height="30px" width="100px" /> : value}
-          </StatNumber>
-          <StatHelpText mb="0">
-            {loading ? <Skeleton height="16px" width="160px" /> : helpText}
-          </StatHelpText>
-        </Stat>
-      </CardBody>
-    </Card>
-  );
-}
 
 const customerPreviewColumns = [
   {
@@ -353,63 +334,59 @@ export default function CustomerPage() {
 
   return (
     <Stack spacing={6}>
-      <Flex
-        justify="space-between"
-        align={{ base: "stretch", md: "center" }}
-        direction={{ base: "column", md: "row" }}
-        gap={4}
-      >
-        <Box>
-          <Heading size="lg">Customers</Heading>
-          <Text color="gray.500" mt={1}>
-            Manage invoice-ready customer profiles with GST, address, and
-            payment terms.
-          </Text>
-        </Box>
+      <PageHeader
+        title="Customers"
+        subtitle="Manage customer master data and GST registrations"
+        actions={
+          <>
+            <Button
+              leftIcon={<FileSpreadsheet size={16} />}
+              variant="outline"
+              onClick={handleDownloadTemplate}
+            >
+              Template
+            </Button>
 
-        <HStack spacing={3}>
-          <Button
-            leftIcon={<FileSpreadsheet size={16} />}
-            variant="outline"
-            onClick={handleDownloadTemplate}
-          >
-            Template
-          </Button>
+            <Button
+              leftIcon={<Download size={16} />}
+              variant="outline"
+              onClick={handleExport}
+            >
+              Export
+            </Button>
 
-          <Button
-            leftIcon={<Download size={16} />}
-            variant="outline"
-            onClick={handleExport}
-          >
-            Export
-          </Button>
-          <Button
-            leftIcon={<Upload size={16} />}
-            variant="outline"
-            colorScheme="blue"
-            onClick={onImportOpen}
-          >
-            Bulk Import
-          </Button>
-          <Button
-            leftIcon={<RefreshCw size={16} />}
-            variant="outline"
-            onClick={() => loadPageData({ silent: true })}
-            isLoading={refreshing}
-          >
-            Refresh
-          </Button>
+            <Button
+              leftIcon={<Upload size={16} />}
+              variant="outline"
+              colorScheme="blue"
+              onClick={onImportOpen}
+            >
+              Bulk Import
+            </Button>
 
-          <Button
-            leftIcon={<Plus size={16} />}
-            colorScheme="blue"
-            onClick={handleCreate}
-          >
-            New Customer
-          </Button>
-        </HStack>
-      </Flex>
+            <Button
+              leftIcon={<RefreshCw size={16} />}
+              variant="outline"
+              onClick={() =>
+                loadPageData({
+                  silent: true,
+                })
+              }
+              isLoading={refreshing}
+            >
+              Refresh
+            </Button>
 
+            <Button
+              leftIcon={<Plus size={16} />}
+              colorScheme="blue"
+              onClick={handleCreate}
+            >
+              New Customer
+            </Button>
+          </>
+        }
+      />
       <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
         <MetricCard
           label="Total Customers"
@@ -431,12 +408,7 @@ export default function CustomerPage() {
         />
       </SimpleGrid>
 
-      <Card
-        borderWidth="1px"
-        borderColor="gray.200"
-        shadow="sm"
-        borderRadius="xl"
-      >
+      <PageCard>
         <CardBody>
           <Stack spacing={4}>
             <SimpleGrid columns={{ base: 1, lg: 4 }} spacing={3}>
@@ -489,8 +461,8 @@ export default function CustomerPage() {
                   <Skeleton height="56px" />
                 </Stack>
               ) : filteredCustomers.length === 0 ? (
-                <Box py={10} textAlign="center">
-                  <Users size={28} style={{ margin: "0 auto" }} />
+                <Box py={16} textAlign="center">
+                  <Users size={40} style={{ margin: "0 auto" }} />
                   <Text fontWeight="600" mt={3}>
                     No customers found
                   </Text>
@@ -617,7 +589,7 @@ export default function CustomerPage() {
             </Box>
           </Stack>
         </CardBody>
-      </Card>
+      </PageCard>
 
       <BulkImportModal
         isOpen={isImportOpen}
