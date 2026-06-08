@@ -14,6 +14,7 @@ public class TenantUserDto {
     private Long tenantId;
     private UserScope scope;
     private Boolean active;
+    private boolean forcePasswordChange;
 
     private Instant createdAt;
     private Instant updatedAt;

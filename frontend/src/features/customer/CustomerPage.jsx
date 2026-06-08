@@ -510,6 +510,7 @@ export default function CustomerPage() {
                       <Th>Billing State</Th>
                       <Th isNumeric>Payment Terms</Th>
                       <Th>Status</Th>
+                      <Th>Updated By</Th>
                       <Th>Actions</Th>
                     </Tr>
                   </Thead>
@@ -582,6 +583,8 @@ export default function CustomerPage() {
                             {customer.active ? "ACTIVE" : "INACTIVE"}
                           </Badge>
                         </Td>
+
+                        <Td>{customer.updatedBy || "—"}</Td>
 
                         <Td>
                           <HStack spacing={2}>

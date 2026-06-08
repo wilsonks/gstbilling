@@ -106,28 +106,20 @@ public class TenantUserImportService {
 
                     try {
 
-                        tenantUserService.update(
-                                existing.get().getId(),
-                                toUpdateRequest(dto)
-                        );
+                        tenantUserService.update(existing.get().getId(), toUpdateRequest(dto));
 
                         updated++;
 
                     } catch (Exception ex) {
 
-                        log.error(
-                                "Failed updating user={} id={}",
-                                dto.getUsername(),
-                                existing.get().getId(),
-                                ex
-                        );
+                        log.error("Failed updating user={} id={}", dto.getUsername(), existing.get().getId(), ex);
 
                         throw ex;
                     }
 
                 } else {
 
-                    tenantUserService.create(toCreateRequest(dto));
+                    tenantUserService.create(toCreateRequest(dto), true);
 
                     inserted++;
                 }
@@ -174,12 +166,7 @@ public class TenantUserImportService {
          * Trim whitespace, ignore blank entries, convert to uppercase, and remove duplicates
          * (Java 16+) returns an immutable list.
          */
-        return Arrays.stream(csv.split(","))
-                .map(String::trim)
-                .filter(s -> !s.isBlank())
-                .map(String::toUpperCase)
-                .distinct()
-                .toList();
+        return Arrays.stream(csv.split(",")).map(String::trim).filter(s -> !s.isBlank()).map(String::toUpperCase).distinct().toList();
     }
 
     private TenantUserCreateRequest toCreateRequest(TenantUserImportDto dto) {

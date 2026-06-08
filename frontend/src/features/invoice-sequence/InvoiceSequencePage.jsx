@@ -391,6 +391,7 @@ export default function InvoiceSequencePage() {
                     <Th>Preview</Th>
                     <Th>Reset Policy</Th>
                     <Th>Status</Th>
+                    <Th>Updated By</Th>
                     <Th>Actions</Th>
                   </Tr>
                 </Thead>
@@ -444,6 +445,8 @@ export default function InvoiceSequencePage() {
                             {sequence.active ? "ACTIVE" : "INACTIVE"}
                           </Badge>
                         </Td>
+
+                        <Td>{sequence.updatedBy || "—"}</Td>
 
                         <Td>
                           <HStack spacing={2}>

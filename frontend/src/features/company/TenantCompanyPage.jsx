@@ -521,6 +521,7 @@ export default function TenantCompanyPage() {
                       <Th>Contact</Th>
                       <Th>Type</Th>
                       <Th>Status</Th>
+                      <Th>Updated By</Th>
                       <Th>Actions</Th>
                     </Tr>
                   </Thead>
@@ -582,6 +583,8 @@ export default function TenantCompanyPage() {
                             {company.active ? "ACTIVE" : "INACTIVE"}
                           </Badge>
                         </Td>
+
+                        <Td>{company.updatedBy || "—"}</Td>
 
                         <Td>
                           <HStack spacing={2}>

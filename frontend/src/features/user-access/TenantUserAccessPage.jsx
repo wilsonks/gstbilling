@@ -41,7 +41,12 @@ import { getMyCompanies } from "../company/companyApi";
 
 function MetricCard({ label, value, helpText, loading = false }) {
   return (
-    <Card borderWidth="1px" borderColor="gray.200" shadow="sm" borderRadius="xl">
+    <Card
+      borderWidth="1px"
+      borderColor="gray.200"
+      shadow="sm"
+      borderRadius="xl"
+    >
       <CardBody>
         <Stat>
           <StatLabel color="gray.500">{label}</StatLabel>
@@ -102,7 +107,7 @@ export default function TenantUserAccessPage() {
           active: 0,
           inactive: 0,
           recentAccess: [],
-        }
+        },
       );
       setUsers(userData || []);
       setCompanies(companyData || []);
@@ -128,7 +133,9 @@ export default function TenantUserAccessPage() {
   }, []);
 
   const roleOptions = useMemo(() => {
-    return [...new Set(accessRows.map((row) => row.role).filter(Boolean))].sort();
+    return [
+      ...new Set(accessRows.map((row) => row.role).filter(Boolean)),
+    ].sort();
   }, [accessRows]);
 
   const filteredRows = useMemo(() => {
@@ -137,10 +144,18 @@ export default function TenantUserAccessPage() {
     return accessRows.filter((row) => {
       const matchesQuery =
         !q ||
-        String(row.username || "").toLowerCase().includes(q) ||
-        String(row.userEmail || "").toLowerCase().includes(q) ||
-        String(row.companyName || "").toLowerCase().includes(q) ||
-        String(row.companyGstin || "").toLowerCase().includes(q);
+        String(row.username || "")
+          .toLowerCase()
+          .includes(q) ||
+        String(row.userEmail || "")
+          .toLowerCase()
+          .includes(q) ||
+        String(row.companyName || "")
+          .toLowerCase()
+          .includes(q) ||
+        String(row.companyGstin || "")
+          .toLowerCase()
+          .includes(q);
 
       const matchesStatus =
         !statusFilter ||
@@ -177,7 +192,9 @@ export default function TenantUserAccessPage() {
       }
 
       toast({
-        title: record.active ? "User access deactivated" : "User access reactivated",
+        title: record.active
+          ? "User access deactivated"
+          : "User access reactivated",
         status: "success",
         duration: 2500,
         isClosable: true,
@@ -206,7 +223,8 @@ export default function TenantUserAccessPage() {
         <Box>
           <Heading size="lg">User Access</Heading>
           <Text color="gray.500" mt={1}>
-            Assign tenant users to companies and manage company-level access roles.
+            Assign tenant users to companies and manage company-level access
+            roles.
           </Text>
         </Box>
 
@@ -220,7 +238,11 @@ export default function TenantUserAccessPage() {
             Refresh
           </Button>
 
-          <Button leftIcon={<Plus size={16} />} colorScheme="blue" onClick={handleCreate}>
+          <Button
+            leftIcon={<Plus size={16} />}
+            colorScheme="blue"
+            onClick={handleCreate}
+          >
             New Access
           </Button>
         </HStack>
@@ -247,7 +269,12 @@ export default function TenantUserAccessPage() {
         />
       </SimpleGrid>
 
-      <Card borderWidth="1px" borderColor="gray.200" shadow="sm" borderRadius="xl">
+      <Card
+        borderWidth="1px"
+        borderColor="gray.200"
+        shadow="sm"
+        borderRadius="xl"
+      >
         <CardBody>
           <Stack spacing={4}>
             <SimpleGrid columns={{ base: 1, lg: 3 }} spacing={3}>
@@ -305,6 +332,7 @@ export default function TenantUserAccessPage() {
                       <Th>Company</Th>
                       <Th>Role</Th>
                       <Th>Status</Th>
+                      <Th>Updated By</Th>
                       <Th>Actions</Th>
                     </Tr>
                   </Thead>
@@ -322,7 +350,9 @@ export default function TenantUserAccessPage() {
 
                         <Td>
                           <Stack spacing={0}>
-                            <Text fontWeight="600">{row.companyName || "—"}</Text>
+                            <Text fontWeight="600">
+                              {row.companyName || "—"}
+                            </Text>
                             <Text fontSize="xs" color="gray.500">
                               {row.companyGstin || "—"}
                             </Text>
@@ -338,6 +368,8 @@ export default function TenantUserAccessPage() {
                             {row.active ? "ACTIVE" : "INACTIVE"}
                           </Badge>
                         </Td>
+
+                        <Td>{row.updatedBy || "—"}</Td>
 
                         <Td>
                           <HStack spacing={2}>

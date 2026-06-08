@@ -30,7 +30,7 @@ public class TenantUserController {
 
     @PostMapping
     public TenantUserDto create(@RequestBody TenantUserCreateRequest request) {
-        return service.create(request);
+        return service.create(request, false);
     }
 
     @PutMapping("/{id}")
@@ -66,6 +66,16 @@ public class TenantUserController {
     @PostMapping("/{id}/reactivate")
     public TenantUserDto reactivate(@PathVariable Long id) {
         return service.reactivate(id);
+    }
+
+    @PostMapping("/{id}/change-password")
+    public void changePassword(@PathVariable Long id, @RequestBody ChangePasswordRequest request) {
+        service.changePassword(id, request);
+    }
+
+    @PostMapping("/{id}/reset-password")
+    public void resetPassword(@PathVariable Long id) {
+        service.resetPassword(id);
     }
 
     @GetMapping(value = "/template", produces = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")

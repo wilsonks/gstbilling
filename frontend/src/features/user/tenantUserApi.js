@@ -115,3 +115,9 @@ export async function downloadUserImportErrors(file) {
 
   return response.data;
 }
+
+export async function resetUserPassword(id) {
+  const response = await api.post(`/api/users/${id}/reset-password`);
+
+  return response.data;
+}

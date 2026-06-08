@@ -51,6 +51,7 @@ import {
   validateUserImport,
   commitUserImport,
   downloadUserImportErrors,
+  resetUserPassword,
 } from "./tenantUserApi";
 
 function MetricCard({ label, value, helpText, loading = false }) {
@@ -164,6 +165,35 @@ export default function TenantUserPage() {
   const [roleFilter, setRoleFilter] = useState("");
 
   const [selectedUser, setSelectedUser] = useState(null);
+
+  const handleResetPassword = async (user) => {
+    const confirmed = window.confirm(`Reset password for ${user.username}?`);
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await resetUserPassword(user.id);
+
+      toast({
+        title: "Password reset",
+        description: `Temporary password: Temp@12345`,
+        status: "success",
+      });
+
+      loadPageData({
+        silent: true,
+      });
+    } catch (error) {
+      toast({
+        title: "Reset failed",
+        description:
+          error?.response?.data?.message || "Unable to reset password",
+        status: "error",
+      });
+    }
+  };
 
   const downloadBlob = (blob, filename) => {
     const url = window.URL.createObjectURL(blob);
@@ -455,6 +485,7 @@ export default function TenantUserPage() {
                       <Th>Roles</Th>
                       <Th>Scope</Th>
                       <Th>Status</Th>
+                      <Th>Updated By</Th>
                       <Th>Actions</Th>
                     </Tr>
                   </Thead>
@@ -485,6 +516,8 @@ export default function TenantUserPage() {
                           </Badge>
                         </Td>
 
+                        <Td>{user.updatedBy || "—"}</Td>
+
                         <Td>
                           <HStack spacing={2}>
                             <IconButton
@@ -505,6 +538,14 @@ export default function TenantUserPage() {
                                   : "Reactivate user"
                               }
                               onClick={() => handleToggleStatus(user)}
+                            />
+                            <IconButton
+                              size="sm"
+                              variant="outline"
+                              colorScheme="blue"
+                              icon={<RefreshCw size={16} />}
+                              aria-label="Reset password"
+                              onClick={() => handleResetPassword(user)}
                             />
                           </HStack>
                         </Td>

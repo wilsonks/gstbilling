@@ -559,6 +559,7 @@ export default function ProductPage() {
                       <Th isNumeric>GST %</Th>
                       <Th isNumeric>Default Price</Th>
                       <Th>Status</Th>
+                      <Th>Updated By</Th>
                       <Th>Actions</Th>
                     </Tr>
                   </Thead>
@@ -627,6 +628,7 @@ export default function ProductPage() {
                             {product.active ? "ACTIVE" : "INACTIVE"}
                           </Badge>
                         </Td>
+                        <Td>{product.updatedBy || "—"}</Td>
 
                         <Td>
                           <HStack spacing={2}>

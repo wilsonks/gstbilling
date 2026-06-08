@@ -45,5 +45,8 @@ public class User extends BaseEntity {
     private List<String> roles;
 
     @Column(nullable = false)
+    private boolean forcePasswordChange = false;
+
+    @Column(nullable = false)
     private boolean active;
 }
