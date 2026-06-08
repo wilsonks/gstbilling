@@ -13,6 +13,7 @@ import AdminLayout from "../layout/AdminLayout";
  * =======================================================*/
 import ProtectedRoute from "./ProtectedRoute";
 import PlatformRoute from "./PlatformRoute";
+import RequirePasswordChange from "./RequirePasswordChange";
 
 /* =========================================================
  * Auth
@@ -27,6 +28,7 @@ import TenantDashboardPage from "../features/tenant/TenantDashboardPage";
 import TenantCompanyPage from "../features/company/TenantCompanyPage";
 import TenantUserPage from "../features/user/TenantUserPage";
 import TenantUserAccessPage from "../features/user-access/TenantUserAccessPage";
+import ChangePasswordPage from "../features/user/ChangePasswordPage";
 import ProductPage from "../features/product/ProductPage";
 import CustomerPage from "../features/customer/CustomerPage";
 import InvoiceSequencePage from "../features/invoice-sequence/InvoiceSequencePage";
@@ -71,7 +73,9 @@ function AppRouterContent() {
 
   const tenantWrapped = (element) => (
     <ProtectedRoute>
-      <AppLayout>{element}</AppLayout>
+      <RequirePasswordChange>
+        <AppLayout>{element}</AppLayout>
+      </RequirePasswordChange>
     </ProtectedRoute>
   );
 
@@ -101,47 +105,119 @@ function AppRouterContent() {
           }
         />
         <Route path="/register" element={<RegisterPage />} />
-
-        <Route path="/dashboard" element={tenantWrapped(<TenantDashboardPage />)} />
-        <Route path="/companies" element={tenantWrapped(<TenantCompanyPage />)} />
+        <Route
+          path="/change-password"
+          element={tenantWrapped(<ChangePasswordPage />)}
+        />
+        <Route
+          path="/dashboard"
+          element={tenantWrapped(<TenantDashboardPage />)}
+        />
+        <Route
+          path="/companies"
+          element={tenantWrapped(<TenantCompanyPage />)}
+        />
         <Route path="/users" element={tenantWrapped(<TenantUserPage />)} />
-        <Route path="/user-access" element={tenantWrapped(<TenantUserAccessPage />)} />
+        <Route
+          path="/user-access"
+          element={tenantWrapped(<TenantUserAccessPage />)}
+        />
         <Route path="/products" element={tenantWrapped(<ProductPage />)} />
         <Route path="/customers" element={tenantWrapped(<CustomerPage />)} />
-        <Route path="/invoice-sequences" element={tenantWrapped(<InvoiceSequencePage />)} />
+        <Route
+          path="/invoice-sequences"
+          element={tenantWrapped(<InvoiceSequencePage />)}
+        />
 
         <Route path="/invoices" element={tenantWrapped(<InvoicePage />)} />
-        <Route path="/invoices/new" element={tenantWrapped(<TaxInvoiceCreatePage />)} />
-        <Route path="/invoices/:id" element={tenantWrapped(<InvoiceDetailsPage />)} />
+        <Route
+          path="/invoices/new"
+          element={tenantWrapped(<TaxInvoiceCreatePage />)}
+        />
+        <Route
+          path="/invoices/:id"
+          element={tenantWrapped(<InvoiceDetailsPage />)}
+        />
 
-        <Route path="/proforma-invoices" element={tenantWrapped(<ProformaInvoicePage />)} />
-        <Route path="/proforma-invoices/new" element={tenantWrapped(<ProformaInvoiceCreatePage />)} />
-        <Route path="/proforma-invoices/:id" element={tenantWrapped(<ProformaInvoiceDetailsPage />)} />
+        <Route
+          path="/proforma-invoices"
+          element={tenantWrapped(<ProformaInvoicePage />)}
+        />
+        <Route
+          path="/proforma-invoices/new"
+          element={tenantWrapped(<ProformaInvoiceCreatePage />)}
+        />
+        <Route
+          path="/proforma-invoices/:id"
+          element={tenantWrapped(<ProformaInvoiceDetailsPage />)}
+        />
 
-        <Route path="/credit-notes" element={tenantWrapped(<CreditNotePage />)} />
-        <Route path="/credit-notes/new" element={tenantWrapped(<CreditNoteCreatePage />)} />
-        <Route path="/credit-notes/:id" element={tenantWrapped(<CreditNoteDetailsPage />)} />
+        <Route
+          path="/credit-notes"
+          element={tenantWrapped(<CreditNotePage />)}
+        />
+        <Route
+          path="/credit-notes/new"
+          element={tenantWrapped(<CreditNoteCreatePage />)}
+        />
+        <Route
+          path="/credit-notes/:id"
+          element={tenantWrapped(<CreditNoteDetailsPage />)}
+        />
 
         <Route path="/debit-notes" element={tenantWrapped(<DebitNotePage />)} />
-        <Route path="/debit-notes/new" element={tenantWrapped(<DebitNoteCreatePage />)} />
-        <Route path="/debit-notes/:id" element={tenantWrapped(<DebitNoteDetailsPage />)} />
+        <Route
+          path="/debit-notes/new"
+          element={tenantWrapped(<DebitNoteCreatePage />)}
+        />
+        <Route
+          path="/debit-notes/:id"
+          element={tenantWrapped(<DebitNoteDetailsPage />)}
+        />
 
         {/* Legacy redirects */}
         <Route path="/invoice" element={<Navigate to="/invoices" replace />} />
-        <Route path="/invoice/new" element={<Navigate to="/invoices/new" replace />} />
+        <Route
+          path="/invoice/new"
+          element={<Navigate to="/invoices/new" replace />}
+        />
         <Route path="/parties" element={<Navigate to="/customers" replace />} />
 
         <Route path="/admin" element={adminWrapped(<DashboardPage />)} />
         <Route path="/admin/tenants" element={adminWrapped(<TenantPage />)} />
-        <Route path="/admin/tenants/:id" element={adminWrapped(<TenantDetailsPage />)} />
-        <Route path="/admin/companies" element={adminWrapped(<CompanyPage />)} />
-        <Route path="/admin/companies/:id" element={adminWrapped(<CompanyDetailsPage />)} />
+        <Route
+          path="/admin/tenants/:id"
+          element={adminWrapped(<TenantDetailsPage />)}
+        />
+        <Route
+          path="/admin/companies"
+          element={adminWrapped(<CompanyPage />)}
+        />
+        <Route
+          path="/admin/companies/:id"
+          element={adminWrapped(<CompanyDetailsPage />)}
+        />
         <Route path="/admin/users" element={adminWrapped(<UserPage />)} />
-        <Route path="/admin/users/:id" element={adminWrapped(<UserDetailsPage />)} />
-        <Route path="/admin/user-access" element={adminWrapped(<UserAccessPage />)} />
-        <Route path="/admin/user-access/:id" element={adminWrapped(<UserAccessDetailsPage />)} />
-        <Route path="/admin/audit-logs" element={adminWrapped(<AuditLogsPage />)} />
-        <Route path="/admin/audit-logs/:id" element={adminWrapped(<AuditLogDetailsModal />)} />
+        <Route
+          path="/admin/users/:id"
+          element={adminWrapped(<UserDetailsPage />)}
+        />
+        <Route
+          path="/admin/user-access"
+          element={adminWrapped(<UserAccessPage />)}
+        />
+        <Route
+          path="/admin/user-access/:id"
+          element={adminWrapped(<UserAccessDetailsPage />)}
+        />
+        <Route
+          path="/admin/audit-logs"
+          element={adminWrapped(<AuditLogsPage />)}
+        />
+        <Route
+          path="/admin/audit-logs/:id"
+          element={adminWrapped(<AuditLogDetailsModal />)}
+        />
         <Route path="/admin/metrics" element={adminWrapped(<MetricsPage />)} />
         <Route path="/admin/billing" element={adminWrapped(<BillingPage />)} />
 
@@ -163,17 +239,41 @@ function AppRouterContent() {
 
       {backgroundLocation && (
         <Routes>
-          <Route path="/invoices/new" element={tenantWrapped(<TaxInvoiceCreatePage />)} />
-          <Route path="/invoices/:id" element={tenantWrapped(<InvoiceDetailsPage />)} />
+          <Route
+            path="/invoices/new"
+            element={tenantWrapped(<TaxInvoiceCreatePage />)}
+          />
+          <Route
+            path="/invoices/:id"
+            element={tenantWrapped(<InvoiceDetailsPage />)}
+          />
 
-          <Route path="/proforma-invoices/new" element={tenantWrapped(<ProformaInvoiceCreatePage />)} />
-          <Route path="/proforma-invoices/:id" element={tenantWrapped(<ProformaInvoiceDetailsPage />)} />
+          <Route
+            path="/proforma-invoices/new"
+            element={tenantWrapped(<ProformaInvoiceCreatePage />)}
+          />
+          <Route
+            path="/proforma-invoices/:id"
+            element={tenantWrapped(<ProformaInvoiceDetailsPage />)}
+          />
 
-          <Route path="/credit-notes/new" element={tenantWrapped(<CreditNoteCreatePage />)} />
-          <Route path="/credit-notes/:id" element={tenantWrapped(<CreditNoteDetailsPage />)} />
+          <Route
+            path="/credit-notes/new"
+            element={tenantWrapped(<CreditNoteCreatePage />)}
+          />
+          <Route
+            path="/credit-notes/:id"
+            element={tenantWrapped(<CreditNoteDetailsPage />)}
+          />
 
-          <Route path="/debit-notes/new" element={tenantWrapped(<DebitNoteCreatePage />)} />
-          <Route path="/debit-notes/:id" element={tenantWrapped(<DebitNoteDetailsPage />)} />
+          <Route
+            path="/debit-notes/new"
+            element={tenantWrapped(<DebitNoteCreatePage />)}
+          />
+          <Route
+            path="/debit-notes/:id"
+            element={tenantWrapped(<DebitNoteDetailsPage />)}
+          />
         </Routes>
       )}
     </>

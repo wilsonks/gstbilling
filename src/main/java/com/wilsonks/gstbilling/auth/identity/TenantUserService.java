@@ -9,6 +9,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -144,17 +146,12 @@ public class TenantUserService {
         return toDto(user);
     }
 
-    public void changePassword(Long id, ChangePasswordRequest request) {
 
-        Long tenantId = getTenantIdOrThrow();
+    public void changePassword(ChangePasswordRequest request) {
 
-        User user = userRepository.findByIdAndTenantId(id, tenantId).orElseThrow(() -> new NotFoundException("User not found: " + id));
+        User currentUser = currentUser();
 
-        if (user.getScope() != UserScope.TENANT) {
-            throw new IllegalArgumentException("User is not a tenant user");
-        }
-
-        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+        if (!passwordEncoder.matches(request.getCurrentPassword(), currentUser.getPassword())) {
 
             throw new IllegalArgumentException("Current password is incorrect");
         }
@@ -164,11 +161,28 @@ public class TenantUserService {
             throw new IllegalArgumentException("Passwords do not match");
         }
 
-        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        currentUser.setPassword(passwordEncoder.encode(request.getNewPassword()));
 
-        user.setForcePasswordChange(false);
+        currentUser.setForcePasswordChange(false);
 
-        userRepository.save(user);
+        userRepository.save(currentUser);
+    }
+
+
+    private User currentUser() {
+
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        if (authentication == null || !authentication.isAuthenticated() || authentication.getPrincipal() == null || !(authentication.getPrincipal() instanceof User)) {
+
+            throw new IllegalStateException("No authenticated user found");
+        }
+        return (User) authentication.getPrincipal();
+    }
+
+    public TenantUserDto currentUserDto() {
+        User user = currentUser();
+        return toDto(user);
     }
 
 

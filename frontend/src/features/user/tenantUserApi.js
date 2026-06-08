@@ -121,3 +121,15 @@ export async function resetUserPassword(id) {
 
   return response.data;
 }
+
+export async function getCurrentUser() {
+  const response = await api.get("/api/users/me");
+
+  return response.data;
+}
+
+export async function changePassword(payload) {
+  const response = await api.post("/api/users/change-password", payload);
+
+  return response.data;
+}

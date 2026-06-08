@@ -48,6 +48,19 @@ public class TenantUserController {
         return service.list(q, pageable);
     }
 
+    //For a logged-in user changing their own password, use:
+    @PostMapping("/change-password")
+    public void changePassword(@RequestBody ChangePasswordRequest request) {
+
+        service.changePassword(request);
+    }
+
+    //For a logged-in user changing their own profile, use:
+    @GetMapping("/me")
+    public TenantUserDto me() {
+        return service.currentUserDto();
+    }
+
     @GetMapping("/mine")
     public List<TenantUserDto> mine() {
         return service.mine();
@@ -68,11 +81,8 @@ public class TenantUserController {
         return service.reactivate(id);
     }
 
-    @PostMapping("/{id}/change-password")
-    public void changePassword(@PathVariable Long id, @RequestBody ChangePasswordRequest request) {
-        service.changePassword(id, request);
-    }
 
+    //For Admin resetting another user's password, use:
     @PostMapping("/{id}/reset-password")
     public void resetPassword(@PathVariable Long id) {
         service.resetPassword(id);
