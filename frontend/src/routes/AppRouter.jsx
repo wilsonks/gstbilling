@@ -73,9 +73,7 @@ function AppRouterContent() {
 
   const tenantWrapped = (element) => (
     <ProtectedRoute>
-      <RequirePasswordChange>
-        <AppLayout>{element}</AppLayout>
-      </RequirePasswordChange>
+      <AppLayout>{element}</AppLayout>
     </ProtectedRoute>
   );
 
