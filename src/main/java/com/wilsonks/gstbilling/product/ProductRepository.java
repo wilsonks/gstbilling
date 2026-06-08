@@ -32,4 +32,6 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     long countByTenantIdAndActiveTrue(Long tenantId);
 
     List<Product> findTop5ByTenantIdOrderByUpdatedAtDesc(Long tenantId);
+
+    long countByTenantIdAndActiveFalse(Long tenantId);
 }

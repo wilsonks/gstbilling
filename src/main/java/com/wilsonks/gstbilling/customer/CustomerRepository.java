@@ -44,4 +44,8 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
     Optional<Customer> findByTenantIdAndGstinIgnoreCase(
             Long tenantId,
             String gstin);
+
+    long countByTenantIdAndActiveFalse(Long tenantId);
+
+
 }
