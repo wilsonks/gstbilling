@@ -1,0 +1,18 @@
+services:
+  gst-billing-poc:
+    build:
+        context: .
+        dockerfile: Dockerfile
+    image: tykhegaming/gst-billing-mvp:latest
+    container_name: gst-billing-poc
+    networks:
+     - sas-network
+    ports:
+      - "9100:9100"
+    restart: unless-stopped
+
+
+networks:
+  sas-network:
+    external: true
+    name: sas-network
